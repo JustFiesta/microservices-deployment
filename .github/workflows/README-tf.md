@@ -1,16 +1,5 @@
 # Terraform GitHub Actions Workflows - User Guide
 
-## 📁 File Structure
-
-Create the following files inside .github/workflows/:
-
-```shell
-.github/
-└── workflows/
-    ├── terraform-plan.yml     # Automatic planning
-    └── terraform-apply.yml    # Apply on demand
-```
-
 ## 🚀 Features
 
 1. Automatic Planning (terraform-plan.yml)

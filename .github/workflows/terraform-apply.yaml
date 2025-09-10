@@ -4,22 +4,32 @@ on:
   issue_comment:
     types: [created]
 
+env:
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  TF_VERSION: '1.13.1'
+
 jobs:
-  check-comment:
-    name: 'Check Comment Trigger'
+  check-apply-comment:
+    name: 'Check TF Apply Comment Trigger'
     runs-on: ubuntu-latest
+
     if: github.event.issue.pull_request && (contains(github.event.comment.body, '@bot apply') || contains(github.event.comment.body, '@bot reapply'))
+    
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
       environment: ${{ steps.check.outputs.environment }}
       action-type: ${{ steps.check.outputs.action-type }}
-    
+
     steps:
     - name: Check permissions and extract environment
       id: check
       uses: actions/github-script@v7
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ env.GH_TOKEN }}
         script: |
           // Check if user has write permissions
           const { data: collaborator } = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -71,8 +81,8 @@ jobs:
   terraform-apply:
     name: 'Terraform Apply'
     runs-on: ubuntu-latest
-    needs: check-comment
-    if: needs.check-comment.outputs.should-run == 'true'
+    needs: check-apply-comment
+    if: needs.check-apply-comment.outputs.should-run == 'true'
     
     permissions:
       contents: read
@@ -84,16 +94,15 @@ jobs:
         env_dir: ["terraform/dev", "terraform/prod"]
 
     env:
-      TF_VERSION: '1.13.1'
       WORKING_DIR: ${{ matrix.env_dir }}
-      ACTION_TYPE: ${{ needs.check-comment.outputs.action-type }}
+      ACTION_TYPE: ${{ needs.check-apply-comment.outputs.action-type }}
       
     steps:
     - name: Get PR details
       id: pr
       uses: actions/github-script@v7
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ env.GH_TOKEN }}
         script: |
           const { data: pr } = await github.rest.pulls.get({
             owner: context.repo.owner,
@@ -113,20 +122,19 @@ jobs:
       with:
         terraform_version: ${{ env.TF_VERSION }}
 
-    - name: Configure AWS Credentials
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+        aws-region: ${{ env.AWS_REGION }}
 
     - name: Terraform Init
       id: init
       working-directory: ${{ env.WORKING_DIR }}
       run: |
         terraform init \
-          -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-          -backend-config="region=${{ secrets.AWS_REGION }}"
+          -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+          -backend-config="region=${{ env.AWS_REGION }}"
 
     - name: Download Plan (for apply)
       if: env.ACTION_TYPE == 'apply'
@@ -163,7 +171,7 @@ jobs:
     - name: Comment PR with Apply Results
       uses: actions/github-script@v7
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ env.GH_TOKEN }}
         script: |
           const fs = require('fs');
           const path = require('path');
