@@ -181,6 +181,17 @@ jobs:
         aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    - name: Debug paths
+      run: |
+        echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+        echo "matrix.env_dir=${{ matrix.env_dir }}"
+        echo "WORKING_DIR=${{ env.WORKING_DIR }}"
+        echo "TARGET_ENV=${{ env.TARGET_ENV }}"
+        echo "ls -la $GITHUB_WORKSPACE"
+        ls -la $GITHUB_WORKSPACE
+        echo "ls -la $GITHUB_WORKSPACE/${{ env.WORKING_DIR }}"
+        ls -la $GITHUB_WORKSPACE/${{ env.WORKING_DIR }} || echo "⚠️ Directory not found"
+
     - name: Terraform Format Check
       id: fmt
       run: terraform fmt -check -recursive
@@ -188,7 +199,7 @@ jobs:
 
     - name: Terraform Init
       id: init
-      working-directory: ${{ github.workspace }}/${{ env.WORKING_DIR }}
+      working-directory: ${{ env.WORKING_DIR }}
       run: |
         terraform init \
           -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
