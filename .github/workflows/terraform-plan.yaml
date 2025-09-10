@@ -192,8 +192,8 @@ jobs:
             output += `
           
           **🚀 Commands:**
-          - To apply to specific environment: \`@bot run apply env=dev\` or \`@bot run apply env=prod\`  
-          - To apply to all environments: \`@bot run apply\`
+          - To apply to specific environment: \`@bot apply env=dev\` or \`@bot apply env=prod\`  
+          - To apply to all environments: \`@bot apply\`
           - To replan and apply: \`@bot reapply\`
           - To run plan again: \`@bot plan\``;
           }

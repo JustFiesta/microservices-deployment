@@ -8,7 +8,7 @@ jobs:
   check-comment:
     name: 'Check Comment Trigger'
     runs-on: ubuntu-latest
-    if: github.event.issue.pull_request && (contains(github.event.comment.body, '@bot run apply') || contains(github.event.comment.body, '@bot reapply'))
+    if: github.event.issue.pull_request && (contains(github.event.comment.body, '@bot apply') || contains(github.event.comment.body, '@bot reapply'))
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
       environment: ${{ steps.check.outputs.environment }}
