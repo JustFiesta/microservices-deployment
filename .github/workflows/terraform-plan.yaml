@@ -187,6 +187,12 @@ jobs:
         echo "TARGET_ENV=${{ env.TARGET_ENV }}"
         echo "ls -la $GITHUB_WORKSPACE"
         ls -la $GITHUB_WORKSPACE
+        echo "ls -la $GITHUB_WORKSPACE/terraform"
+        if [ -d "$GITHUB_WORKSPACE/terraform" ]; then
+            ls -la "$GITHUB_WORKSPACE/terraform"
+        else
+            echo "⚠️ Directory not found"
+        fi
         echo "ls -la $GITHUB_WORKSPACE/${{ env.WORKING_DIR }}"
         if [ -d "$GITHUB_WORKSPACE/${{ env.WORKING_DIR }}" ]; then
             ls -la "$GITHUB_WORKSPACE/${{ env.WORKING_DIR }}"
