@@ -166,8 +166,6 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v4
-      with:
-        ref: ${{ steps.pr-comment.outputs.ref || github.event.pull_request.head.sha }}
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
