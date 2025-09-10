@@ -44,9 +44,9 @@ Add the following secrets in the repository settings:
 DOCKERHUB_USERNAME      # Docker Hub username (for CI)
 DOCKERHUB_PASSWORD      # Docker Hub password (for CI)
 ECR_REGISTRY            # ECR registry URL (for CD)
+AWS_ACCESS_KEY_ID       # AWS Access Key
+AWS_SECRET_ACCESS_KEY   # AWS Secret Key  
 AWS_REGION              # AWS region (for CD)
-AWS_ROLE_TO_ASSUME      # AWS IAM role to assume (for CD)
-GITHUB_TOKEN            # Provided by GitHub Actions (for CI)
 ```
 
 ## 🔐 Permissions
