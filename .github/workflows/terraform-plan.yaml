@@ -193,6 +193,14 @@ jobs:
         else
             echo "⚠️ Directory not found"
         fi
+
+        echo "ls -la $GITHUB_WORKSPACE/terraform/dev manual"
+        if [ -d "$GITHUB_WORKSPACE/terraform/dev" ]; then
+            ls -la "$GITHUB_WORKSPACE/terraform/dev"
+        else
+            echo "⚠️ Directory not found"
+        fi
+
         echo "ls -la $GITHUB_WORKSPACE/${{ env.WORKING_DIR }}"
         if [ -d "$GITHUB_WORKSPACE/${{ env.WORKING_DIR }}" ]; then
             ls -la "$GITHUB_WORKSPACE/${{ env.WORKING_DIR }}"
