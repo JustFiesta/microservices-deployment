@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - 'terraform/**'
-      - 'terraform/modules/**'
   issue_comment:
     types: [created]
 
@@ -22,15 +21,77 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
+  detect-environments:
+    name: 'Detect Changed Environments'
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.detect.outputs.environments }}
+      has-changes: ${{ steps.detect.outputs.has-changes }}
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect changed environments
+      id: detect
+      run: |
+        # Get all environment directories
+        ALL_ENVS=$(find terraform -maxdepth 1 -type d ! -path terraform | sed 's|terraform/||' | sort)
+        echo "Available environments: $ALL_ENVS"
+        
+        # Detect changed files
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+        else
+          # Check all environments for issue comments
+          CHANGED_FILES="terraform/"
+        fi
+        
+        echo "Changed files: $CHANGED_FILES"
+        
+        # Detect which environments have changes
+        CHANGED_ENVS=""
+        for env in $ALL_ENVS; do
+          if echo "$CHANGED_FILES" | grep -q "^terraform/$env/" || echo "$CHANGED_FILES" | grep -q "^terraform/modules/"; then
+            if [ -z "$CHANGED_ENVS" ]; then
+              CHANGED_ENVS="$env"
+            else
+              CHANGED_ENVS="$CHANGED_ENVS,$env"
+            fi
+          fi
+        done
+        
+        # If any module files changed, include environment
+        if echo "$CHANGED_FILES" | grep -q "^terraform/modules/"; then
+          CHANGED_ENVS=$(echo $ALL_ENVS | tr ' ' ',')
+        fi
+        
+        echo "Changed environments: $CHANGED_ENVS"
+        
+        if [ -n "$CHANGED_ENVS" ]; then
+          # Convert to JSON array format for matrix
+          JSON_ENVS=$(echo "$CHANGED_ENVS" | jq -R -s -c 'split(",") | map(select(. != "")) | map("terraform/" + .)')
+          echo "environments=$JSON_ENVS" >> $GITHUB_OUTPUT
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+          echo "Matrix environments: $JSON_ENVS"
+        else
+          echo "environments=[]" >> $GITHUB_OUTPUT
+          echo "has-changes=false" >> $GITHUB_OUTPUT
+          echo "No environment changes detected"
+        fi
+
   check-plan-comment:
     name: 'Check TF Plan Comment Trigger'
     runs-on: ubuntu-latest
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@bot plan')
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
+      target-env: ${{ steps.check.outputs.target-env }}
     
     steps:
-    - name: Check permissions
+    - name: Check permissions and extract environment
       id: check
       uses: actions/github-script@v7
       with:
@@ -45,6 +106,15 @@ jobs:
           const hasPermission = ['admin', 'write', 'read'].includes(collaborator.permission);
           core.setOutput('should-run', hasPermission.toString());
           
+          // Check for specific environment in comment
+          const comment = context.payload.comment.body;
+          let targetEnv = '';
+          const envMatch = comment.match(/env=(\w+)/);
+          if (envMatch) {
+            targetEnv = envMatch[1];
+          }
+          core.setOutput('target-env', targetEnv);
+          
           if (hasPermission) {
             await github.rest.reactions.createForIssueComment({
               owner: context.repo.owner,
@@ -57,8 +127,8 @@ jobs:
   terraform-plan:
     name: 'Terraform Plan'
     runs-on: ubuntu-latest
-    if: always() && (github.event_name == 'pull_request' || needs.check-plan-comment.outputs.should-run == 'true')
-    needs: [check-plan-comment]
+    needs: [detect-environments, check-plan-comment]
+    if: always() && (needs.detect-environments.outputs.has-changes == 'true' || needs.check-plan-comment.outputs.should-run == 'true')
     
     permissions:
       contents: read
@@ -67,12 +137,19 @@ jobs:
 
     strategy:
       matrix:
-        env_dir: [ "terraform/dev", "terraform/prod" ] 
+        env_dir: ${{ fromJson(needs.detect-environments.outputs.environments) }}
 
     env:
       WORKING_DIR: ${{ matrix.env_dir }}
+      TARGET_ENV: ${{ needs.check-plan-comment.outputs.target-env }}
       
     steps:
+    - name: Skip if not target environment
+      if: needs.check-plan-comment.outputs.should-run == 'true' && needs.check-plan-comment.outputs.target-env != '' && !endsWith(matrix.env_dir, needs.check-plan-comment.outputs.target-env)
+      run: |
+        echo "Skipping $(basename ${{ matrix.env_dir }}) - not target environment"
+        exit 0
+
     - name: Get PR details (for comment trigger)
       if: github.event_name == 'issue_comment'
       id: pr-comment
@@ -197,15 +274,15 @@ jobs:
           
           </details>`;
           
-          // Dodaj instrukcje tylko dla pierwszego środowiska i jeśli są zmiany
-          if (envName === 'dev' && !noChanges) {
+          // Dodaj instrukcje tylko jeśli są zmiany
+          if (!noChanges) {
             output += `
           
           **🚀 Commands:**
-          - To apply to specific environment: \`@bot apply env=dev\` or \`@bot apply env=prod\`  
-          - To apply to all environments: \`@bot apply\`
-          - To replan and apply: \`@bot reapply\`
-          - To run plan again: \`@bot plan\``;
+          - To apply to this environment: \`@bot apply env=${envName}\`  
+          - To apply to all changed environments: \`@bot apply\`
+          - To replan and apply: \`@bot reapply env=${envName}\`
+          - To run plan again: \`@bot plan env=${envName}\``;
           }
           
           output += `

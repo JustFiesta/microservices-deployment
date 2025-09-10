@@ -16,25 +16,26 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  check-apply-comment:
-    name: 'Check TF Apply Comment Trigger'
+  detect-apply-environments:
+    name: 'Detect Apply Target Environments'
     runs-on: ubuntu-latest
-
     if: github.event.issue.pull_request && (contains(github.event.comment.body, '@bot apply') || contains(github.event.comment.body, '@bot reapply'))
-    
     outputs:
-      should-run: ${{ steps.check.outputs.should-run }}
-      environment: ${{ steps.check.outputs.environment }}
-      action-type: ${{ steps.check.outputs.action-type }}
-
+      environments: ${{ steps.detect.outputs.environments }}
+      action-type: ${{ steps.detect.outputs.action-type }}
+      should-run: ${{ steps.detect.outputs.should-run }}
+    
     steps:
-    - name: Check permissions and extract environment
-      id: check
+    - name: Checkout to get available environments
+      uses: actions/checkout@v4
+      
+    - name: Detect target environments
+      id: detect
       uses: actions/github-script@v7
       with:
         github-token: ${{ env.GH_TOKEN }}
         script: |
-          // Check if user has write permissions
+          // Check permissions first
           const { data: collaborator } = await github.rest.repos.getCollaboratorPermissionLevel({
             owner: context.repo.owner,
             repo: context.repo.repo,
@@ -54,26 +55,51 @@ jobs:
             return;
           }
           
-          // Extract environment from comment (default to both if not specified)
+          // Get available environments
+          const { execSync } = require('child_process');
+          const availableEnvs = execSync('find terraform -maxdepth 1 -type d ! -path terraform | sed "s|terraform/||" | sort', { encoding: 'utf8' }).trim().split('\n').filter(env => env);
+          
+          console.log('Available environments:', availableEnvs);
+          
+          // Parse comment to extract environment and action type
           const comment = context.payload.comment.body;
-          let environment = 'both';
           let actionType = 'apply';
+          let targetEnvs = [];
           
           if (comment.includes('@bot reapply')) {
             actionType = 'reapply';
           }
           
-          if (comment.includes('env=dev') || comment.includes('environment=dev')) {
-            environment = 'dev';
-          } else if (comment.includes('env=prod') || comment.includes('environment=prod')) {
-            environment = 'prod';
+          // Check for specific environment
+          const envMatch = comment.match(/env=(\w+)/);
+          if (envMatch && availableEnvs.includes(envMatch[1])) {
+            targetEnvs = [envMatch[1]];
+          } else if (!envMatch) {
+            // No specific environment - use all available
+            targetEnvs = availableEnvs;
+          } else {
+            // Invalid environment specified
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ Environment "${envMatch[1]}" not found. Available environments: ${availableEnvs.join(', ')}`
+            });
+            core.setOutput('should-run', 'false');
+            return;
           }
           
+          // Convert to matrix format
+          const matrixEnvs = targetEnvs.map(env => `terraform/${env}`);
+          
           core.setOutput('should-run', 'true');
-          core.setOutput('environment', environment);
+          core.setOutput('environments', JSON.stringify(matrixEnvs));
           core.setOutput('action-type', actionType);
           
-          // React to the comment
+          console.log('Target environments:', matrixEnvs);
+          console.log('Action type:', actionType);
+          
+          // React to comment
           await github.rest.reactions.createForIssueComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
@@ -84,8 +110,8 @@ jobs:
   terraform-apply:
     name: 'Terraform Apply'
     runs-on: ubuntu-latest
-    needs: check-apply-comment
-    if: needs.check-apply-comment.outputs.should-run == 'true'
+    needs: detect-apply-environments
+    if: needs.detect-apply-environments.outputs.should-run == 'true'
     
     permissions:
       contents: read
@@ -94,11 +120,11 @@ jobs:
 
     strategy:
       matrix:
-        env_dir: ["terraform/dev", "terraform/prod"]
+        env_dir: ${{ fromJson(needs.detect-apply-environments.outputs.environments) }}
 
     env:
       WORKING_DIR: ${{ matrix.env_dir }}
-      ACTION_TYPE: ${{ needs.check-apply-comment.outputs.action-type }}
+      ACTION_TYPE: ${{ needs.detect-apply-environments.outputs.action-type }}
       
     steps:
     - name: Get PR details
@@ -142,33 +168,36 @@ jobs:
 
     - name: Download Plan (for apply)
       if: env.ACTION_TYPE == 'apply'
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
-        name: tfplan
+        name: tfplan-${{ matrix.env_dir }}-${{ steps.pr.outputs.ref }}
         path: ${{ env.WORKING_DIR }}
       continue-on-error: true
 
-    - name: Terraform Plan (for reapply)
-      if: env.ACTION_TYPE == 'reapply'
-      id: replan
+    - name: Terraform Plan (for reapply or missing plan)
+      id: plan
       working-directory: ${{ env.WORKING_DIR }}
       run: |
         ENV_NAME=$(basename ${{ env.WORKING_DIR }})
-        terraform plan -no-color -out=tfplan \
-          -var="environment=${ENV_NAME}" 2>&1 | tee plan_output.txt
+        
+        if [ "${{ env.ACTION_TYPE }}" == "reapply" ] || [ ! -f "tfplan" ]; then
+          echo "Creating new plan..."
+          terraform plan -no-color -out=tfplan \
+            -var="environment=${ENV_NAME}" 2>&1 | tee plan_output.txt
+        else
+          echo "Using existing plan..."
+        fi
       continue-on-error: true
 
     - name: Terraform Apply
       id: apply
       working-directory: ${{ env.WORKING_DIR }}
       run: |
-        if [ "${{ env.ACTION_TYPE }}" == "reapply" ] || [ -f "tfplan" ]; then
+        if [ -f "tfplan" ]; then
           terraform apply -no-color -auto-approve tfplan 2>&1 | tee apply_output.txt
         else
-          echo "No plan file found. Running fresh plan and apply..."
-          ENV_NAME=$(basename ${{ env.WORKING_DIR }})
-          terraform plan -no-color -out=tfplan -var="environment=${ENV_NAME}"
-          terraform apply -no-color -auto-approve tfplan 2>&1 | tee apply_output.txt
+          echo "❌ No plan file available for apply" | tee apply_output.txt
+          exit 1
         fi
       continue-on-error: true
 
@@ -184,38 +213,70 @@ jobs:
           const actionType = '${{ env.ACTION_TYPE }}';
           
           let applyOutput = '';
+          let planOutput = '';
+          
           try {
             applyOutput = fs.readFileSync(`${workingDir}/apply_output.txt`, 'utf8');
           } catch (error) {
             applyOutput = 'No apply output found.';
           }
           
-          const maxLength = 60000;
-          const truncatedOutput = applyOutput.substring(0, maxLength);
-          const wasTruncated = applyOutput.length > maxLength;
+          // Include plan output for reapply
+          if (actionType === 'reapply') {
+            try {
+              planOutput = fs.readFileSync(`${workingDir}/plan_output.txt`, 'utf8');
+            } catch (error) {
+              planOutput = 'No plan output found.';
+            }
+          }
+          
+          const maxLength = 30000; // Smaller limit to fit both plan and apply
+          const truncatedApplyOutput = applyOutput.substring(0, maxLength);
+          const wasTruncatedApply = applyOutput.length > maxLength;
           
           const actionEmoji = actionType === 'reapply' ? '🔄' : '🚀';
           const actionText = actionType === 'reapply' ? 'Reapply' : 'Apply';
+          const statusEmoji = '${{ steps.apply.outcome }}' === 'success' ? '✅' : '❌';
           
-          let output = `### Terraform ${actionText} Results ${actionEmoji} - Environment: **${envName}**
+          let output = `### ${actionEmoji} Terraform ${actionText} Results - Environment: **${envName}**
           
           #### Initialization: ${{ steps.init.outcome == 'success' && '✅' || '❌' }}`;
           
           if (actionType === 'reapply') {
             output += `
-          #### Re-planning: ${{ steps.replan.outcome == 'success' && '✅' || '❌' }}`;
+          #### Re-planning: ${{ steps.plan.outcome == 'success' && '✅' || '❌' }}`;
           }
           
           output += `
-          #### Apply: ${{ steps.apply.outcome == 'success' && '✅' || '❌' }}
+          #### Apply: ${statusEmoji}`;
+          
+          // Add plan output for reapply
+          if (actionType === 'reapply' && planOutput) {
+            const truncatedPlanOutput = planOutput.substring(0, maxLength);
+            const wasTruncatedPlan = planOutput.length > maxLength;
+            
+            output += `
+          
+          <details><summary>Show Plan Output (Reapply)</summary>
+          
+          \`\`\`terraform
+          ${truncatedPlanOutput}
+          \`\`\`
+          
+          ${wasTruncatedPlan ? '\n⚠️ *Plan output was truncated due to length limits*' : ''}
+          
+          </details>`;
+          }
+          
+          output += `
           
           <details><summary>Show Apply Output</summary>
           
           \`\`\`terraform
-          ${truncatedOutput}
+          ${truncatedApplyOutput}
           \`\`\`
           
-          ${wasTruncated ? '\n⚠️ *Output was truncated due to length limits*' : ''}
+          ${wasTruncatedApply ? '\n⚠️ *Apply output was truncated due to length limits*' : ''}
           
           </details>
           
@@ -233,5 +294,5 @@ jobs:
     - name: Apply Status
       if: steps.apply.outcome == 'failure'
       run: |
-        echo "Terraform apply failed"
+        echo "Terraform apply failed for environment $(basename ${{ env.WORKING_DIR }})"
         exit 1
