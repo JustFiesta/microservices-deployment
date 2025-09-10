@@ -10,7 +10,10 @@
     * push images to repository [DONE]
 2. Contenerise each app for minimal image [DONE]
 3. Create GitHub Actions pipeline for infrastructure with GitOps approach [DONE]
+    !! Fix the paths in TF workflows
 4. Create infrastructure on Cloud:
+    * Access Key [DONE]
+    * S3 for TF [DONE]
     * K8 cluster
     * IAM
 5. Enable K8 cluster to pull images from repository
