@@ -1,0 +1,136 @@
+name: 'Terraform Plan'
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'terraform/modules/**'
+
+jobs:
+  terraform-plan:
+    name: 'Terraform Plan'
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: write
+
+    strategy:
+      matrix:
+        env_dir: [ "terraform/dev", "terraform/prod" ] 
+
+    env:
+      TF_VERSION: '1.13.1'
+      WORKING_DIR: ${{ matrix.env_dir }}
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Terraform Format Check
+      id: fmt
+      run: terraform fmt -check -recursive
+      continue-on-error: true
+
+    - name: Terraform Init
+      id: init
+      working-directory: ${{ env.WORKING_DIR }}
+      run: |
+        terraform init \
+          -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+          -backend-config="region=${{ secrets.AWS_REGION }}"
+
+    - name: Terraform Validate
+      id: validate
+      working-directory: ${{ env.WORKING_DIR }}
+      run: terraform validate -no-color
+
+    - name: Terraform Plan
+      id: plan
+      working-directory: ${{ env.WORKING_DIR }}
+      run: |
+        terraform plan -no-color -out=tfplan \
+          -var="environment=dev" 2>&1 | tee plan_output.txt
+        
+        # Save plan output to a file for later use
+        terraform show -no-color tfplan > tfplan.txt
+      continue-on-error: true
+
+    - name: Save Plan Output
+      uses: actions/upload-artifact@v3
+      with:
+        name: tfplan
+        path: ${{ env.WORKING_DIR }}/tfplan
+
+    - name: Comment PR with Plan
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const planOutput = fs.readFileSync('${{ env.WORKING_DIR }}/plan_output.txt', 'utf8');
+          const maxLength = 65000;
+          
+          let output = `### Terraform Plan Results 🚀
+          
+          #### Format Check: ${{ steps.fmt.outcome == 'success' && '✅' || '❌' }}
+          #### Initialization: ${{ steps.init.outcome == 'success' && '✅' || '❌' }}
+          #### Validation: ${{ steps.validate.outcome == 'success' && '✅' || '❌' }}
+          #### Plan: ${{ steps.plan.outcome == 'success' && '✅' || '❌' }}
+          
+          <details><summary>Show Plan Output</summary>
+          
+          \`\`\`terraform
+          ${planOutput.substring(0, maxLength)}
+          \`\`\`
+          
+          </details>
+          
+          **📝 To apply these changes, comment:** \`@bot run apply\`
+          
+          *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+          
+          // Find and update existing comment or create a new one
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const botComment = comments.find(comment => {
+            return comment.user.type === 'Bot' && comment.body.includes('Terraform Plan Results');
+          });
+          
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: output
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: output
+            });
+          }
+
+    - name: Plan Status
+      if: steps.plan.outcome == 'failure'
+      run: exit 1

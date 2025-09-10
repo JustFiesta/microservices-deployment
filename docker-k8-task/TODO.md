@@ -8,8 +8,8 @@
     * outpu scans to Security tab on GitHub [IN PROGRESS]
     * scan manifests with sec tools in pipeline [IN FUTURE]
     * push images to repository [DONE]
-2. Contenerise each app for minimal image
-3. Create GitHub Actions pipeline for infrastructure with GitOps approach
+2. Contenerise each app for minimal image [DONE]
+3. Create GitHub Actions pipeline for infrastructure with GitOps approach [DONE]
 4. Create infrastructure on Cloud:
     * K8 cluster
     * IAM
