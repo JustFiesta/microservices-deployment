@@ -1,0 +1,225 @@
+name: 'Terraform Apply'
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  check-comment:
+    name: 'Check Comment Trigger'
+    runs-on: ubuntu-latest
+    if: github.event.issue.pull_request && (contains(github.event.comment.body, '@bot run apply') || contains(github.event.comment.body, '@bot reapply'))
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+      environment: ${{ steps.check.outputs.environment }}
+      action-type: ${{ steps.check.outputs.action-type }}
+    
+    steps:
+    - name: Check permissions and extract environment
+      id: check
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          // Check if user has write permissions
+          const { data: collaborator } = await github.rest.repos.getCollaboratorPermissionLevel({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            username: context.actor
+          });
+          
+          const hasPermission = ['admin', 'write'].includes(collaborator.permission);
+          
+          if (!hasPermission) {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '❌ You do not have permission to run terraform apply.'
+            });
+            core.setOutput('should-run', 'false');
+            return;
+          }
+          
+          // Extract environment from comment (default to both if not specified)
+          const comment = context.payload.comment.body;
+          let environment = 'both';
+          let actionType = 'apply';
+          
+          if (comment.includes('@bot reapply')) {
+            actionType = 'reapply';
+          }
+          
+          if (comment.includes('env=dev') || comment.includes('environment=dev')) {
+            environment = 'dev';
+          } else if (comment.includes('env=prod') || comment.includes('environment=prod')) {
+            environment = 'prod';
+          }
+          
+          core.setOutput('should-run', 'true');
+          core.setOutput('environment', environment);
+          core.setOutput('action-type', actionType);
+          
+          // React to the comment
+          await github.rest.reactions.createForIssueComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            comment_id: context.payload.comment.id,
+            content: 'rocket'
+          });
+
+  terraform-apply:
+    name: 'Terraform Apply'
+    runs-on: ubuntu-latest
+    needs: check-comment
+    if: needs.check-comment.outputs.should-run == 'true'
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    strategy:
+      matrix:
+        env_dir: ["terraform/dev", "terraform/prod"]
+
+    env:
+      TF_VERSION: '1.13.1'
+      WORKING_DIR: ${{ matrix.env_dir }}
+      ACTION_TYPE: ${{ needs.check-comment.outputs.action-type }}
+      
+    steps:
+    - name: Get PR details
+      id: pr
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { data: pr } = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+          core.setOutput('ref', pr.head.sha);
+          core.setOutput('branch', pr.head.ref);
+
+    - name: Checkout PR branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.pr.outputs.ref }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Terraform Init
+      id: init
+      working-directory: ${{ env.WORKING_DIR }}
+      run: |
+        terraform init \
+          -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+          -backend-config="region=${{ secrets.AWS_REGION }}"
+
+    - name: Download Plan (for apply)
+      if: env.ACTION_TYPE == 'apply'
+      uses: actions/download-artifact@v3
+      with:
+        name: tfplan
+        path: ${{ env.WORKING_DIR }}
+      continue-on-error: true
+
+    - name: Terraform Plan (for reapply)
+      if: env.ACTION_TYPE == 'reapply'
+      id: replan
+      working-directory: ${{ env.WORKING_DIR }}
+      run: |
+        ENV_NAME=$(basename ${{ env.WORKING_DIR }})
+        terraform plan -no-color -out=tfplan \
+          -var="environment=${ENV_NAME}" 2>&1 | tee plan_output.txt
+      continue-on-error: true
+
+    - name: Terraform Apply
+      id: apply
+      working-directory: ${{ env.WORKING_DIR }}
+      run: |
+        if [ "${{ env.ACTION_TYPE }}" == "reapply" ] || [ -f "tfplan" ]; then
+          terraform apply -no-color -auto-approve tfplan 2>&1 | tee apply_output.txt
+        else
+          echo "No plan file found. Running fresh plan and apply..."
+          ENV_NAME=$(basename ${{ env.WORKING_DIR }})
+          terraform plan -no-color -out=tfplan -var="environment=${ENV_NAME}"
+          terraform apply -no-color -auto-approve tfplan 2>&1 | tee apply_output.txt
+        fi
+      continue-on-error: true
+
+    - name: Comment PR with Apply Results
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const workingDir = '${{ env.WORKING_DIR }}';
+          const envName = path.basename(workingDir);
+          const actionType = '${{ env.ACTION_TYPE }}';
+          
+          let applyOutput = '';
+          try {
+            applyOutput = fs.readFileSync(`${workingDir}/apply_output.txt`, 'utf8');
+          } catch (error) {
+            applyOutput = 'No apply output found.';
+          }
+          
+          const maxLength = 60000;
+          const truncatedOutput = applyOutput.substring(0, maxLength);
+          const wasTruncated = applyOutput.length > maxLength;
+          
+          const actionEmoji = actionType === 'reapply' ? '🔄' : '🚀';
+          const actionText = actionType === 'reapply' ? 'Reapply' : 'Apply';
+          
+          let output = `### Terraform ${actionText} Results ${actionEmoji} - Environment: **${envName}**
+          
+          #### Initialization: ${{ steps.init.outcome == 'success' && '✅' || '❌' }}`;
+          
+          if (actionType === 'reapply') {
+            output += `
+          #### Re-planning: ${{ steps.replan.outcome == 'success' && '✅' || '❌' }}`;
+          }
+          
+          output += `
+          #### Apply: ${{ steps.apply.outcome == 'success' && '✅' || '❌' }}
+          
+          <details><summary>Show Apply Output</summary>
+          
+          \`\`\`terraform
+          ${truncatedOutput}
+          \`\`\`
+          
+          ${wasTruncated ? '\n⚠️ *Output was truncated due to length limits*' : ''}
+          
+          </details>
+          
+          **👤 Applied by:** @${{ github.actor }}
+          **🌿 Branch:** ${{ steps.pr.outputs.branch }}
+          **⏰ Time:** ${new Date().toISOString()}`;
+          
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: output
+          });
+
+    - name: Apply Status
+      if: steps.apply.outcome == 'failure'
+      run: |
+        echo "Terraform apply failed"
+        exit 1

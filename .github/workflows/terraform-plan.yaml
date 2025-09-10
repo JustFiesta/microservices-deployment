@@ -7,15 +7,52 @@ on:
     paths:
       - 'terraform/**'
       - 'terraform/modules/**'
+  issue_comment:
+    types: [created]
 
 jobs:
+  check-plan-comment:
+    name: 'Check Plan Comment'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@bot plan')
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    
+    steps:
+    - name: Check permissions
+      id: check
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { data: collaborator } = await github.rest.repos.getCollaboratorPermissionLevel({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            username: context.actor
+          });
+          
+          const hasPermission = ['admin', 'write', 'read'].includes(collaborator.permission);
+          core.setOutput('should-run', hasPermission.toString());
+          
+          if (hasPermission) {
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+          }
+
   terraform-plan:
     name: 'Terraform Plan'
     runs-on: ubuntu-latest
+    if: always() && (github.event_name == 'pull_request' || needs.check-plan-comment.outputs.should-run == 'true')
+    needs: [check-plan-comment]
     
     permissions:
       contents: read
       pull-requests: write
+      issues: write
 
     strategy:
       matrix:
@@ -26,8 +63,24 @@ jobs:
       WORKING_DIR: ${{ matrix.env_dir }}
       
     steps:
+    - name: Get PR details (for comment trigger)
+      if: github.event_name == 'issue_comment'
+      id: pr-comment
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { data: pr } = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+          core.setOutput('ref', pr.head.sha);
+
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.pr-comment.outputs.ref || github.event.pull_request.head.sha }}
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -63,18 +116,28 @@ jobs:
       id: plan
       working-directory: ${{ env.WORKING_DIR }}
       run: |
+        ENV_NAME=$(basename ${{ env.WORKING_DIR }})
         terraform plan -no-color -out=tfplan \
-          -var="environment=dev" 2>&1 | tee plan_output.txt
+          -var="environment=${ENV_NAME}" 2>&1 | tee plan_output.txt
         
         # Save plan output to a file for later use
         terraform show -no-color tfplan > tfplan.txt
+        
+        if grep -q "No changes" plan_output.txt; then
+          echo "no_changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "no_changes=false" >> $GITHUB_OUTPUT
+        fi
       continue-on-error: true
 
-    - name: Save Plan Output
-      uses: actions/upload-artifact@v3
+    - name: Save Plan Artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: tfplan
-        path: ${{ env.WORKING_DIR }}/tfplan
+        name: tfplan-${{ matrix.env_dir }}-${{ github.event.pull_request.head.sha || steps.pr-comment.outputs.ref }}
+        path: |
+          ${{ env.WORKING_DIR }}/tfplan
+          ${{ env.WORKING_DIR }}/tfplan.txt
+        retention-days: 30
 
     - name: Comment PR with Plan
       uses: actions/github-script@v7
@@ -82,37 +145,77 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
-          const planOutput = fs.readFileSync('${{ env.WORKING_DIR }}/plan_output.txt', 'utf8');
-          const maxLength = 65000;
+          const path = require('path');
+          const workingDir = '${{ env.WORKING_DIR }}';
+          const envName = path.basename(workingDir);
           
-          let output = `### Terraform Plan Results 🚀
+          let planOutput = '';
+          try {
+            planOutput = fs.readFileSync(`${workingDir}/plan_output.txt`, 'utf8');
+          } catch (error) {
+            planOutput = 'Could not read plan output.';
+          }
+          
+          const maxLength = 60000;
+          const truncatedOutput = planOutput.substring(0, maxLength);
+          const wasTruncated = planOutput.length > maxLength;
+          const noChanges = '${{ steps.plan.outputs.no_changes }}' === 'true';
+          
+          const planEmoji = noChanges ? '✨' : '📋';
+          const statusEmoji = '${{ steps.plan.outcome }}' === 'success' ? '✅' : '❌';
+          
+          let output = `### ${planEmoji} Terraform Plan Results - Environment: **${envName}**
           
           #### Format Check: ${{ steps.fmt.outcome == 'success' && '✅' || '❌' }}
           #### Initialization: ${{ steps.init.outcome == 'success' && '✅' || '❌' }}
           #### Validation: ${{ steps.validate.outcome == 'success' && '✅' || '❌' }}
-          #### Plan: ${{ steps.plan.outcome == 'success' && '✅' || '❌' }}
+          #### Plan: ${statusEmoji}`;
           
-          <details><summary>Show Plan Output</summary>
+          if (noChanges) {
+            output += `\n\n✨ **No changes detected for ${envName} environment**`;
+          }
+          
+          output += `
+          
+          <details><summary>Show Plan Output for ${envName}</summary>
           
           \`\`\`terraform
-          ${planOutput.substring(0, maxLength)}
+          ${truncatedOutput}
           \`\`\`
           
-          </details>
+          ${wasTruncated ? '\n⚠️ *Output was truncated due to length limits*' : ''}
           
-          **📝 To apply these changes, comment:** \`@bot run apply\`
+          </details>`;
           
-          *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+          // Dodaj instrukcje tylko dla pierwszego środowiska i jeśli są zmiany
+          if (envName === 'dev' && !noChanges) {
+            output += `
           
-          // Find and update existing comment or create a new one
+          **🚀 Commands:**
+          - To apply to specific environment: \`@bot run apply env=dev\` or \`@bot run apply env=prod\`  
+          - To apply to all environments: \`@bot run apply\`
+          - To replan and apply: \`@bot reapply\`
+          - To run plan again: \`@bot plan\``;
+          }
+          
+          output += `
+          
+          **👤 Triggered by:** @${{ github.actor }}
+          **⏰ Time:** ${new Date().toISOString()}`;
+          
+          const prNumber = context.issue?.number || context.payload.pull_request?.number;
+          
+          // Znajdź istniejący komentarz dla tego środowiska
           const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: context.issue.number,
+            issue_number: prNumber,
           });
           
           const botComment = comments.find(comment => {
-            return comment.user.type === 'Bot' && comment.body.includes('Terraform Plan Results');
+            return comment.user.type === 'Bot' && 
+                   comment.body.includes(`Environment: **${envName}**`) &&
+                   comment.body.includes('Terraform Plan Results');
           });
           
           if (botComment) {
@@ -126,7 +229,7 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: prNumber,
               body: output
             });
           }
