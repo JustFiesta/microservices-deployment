@@ -48,7 +48,7 @@ jobs:
           run: |
             terraform plan -no-color
 
-        - name: Add Plan Comment
+        - name: Add Plan Comment (Plan)
           id: comment
           uses: actions/github-script@v6
           env:
