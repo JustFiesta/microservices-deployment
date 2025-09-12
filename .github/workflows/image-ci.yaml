@@ -2,7 +2,10 @@ name: Container Image CI
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+    paths:
+      - 'microservices-demo/**'
 
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # automatically provided by GitHub Actions

@@ -2,6 +2,10 @@ name: Container Image CD
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - 'microservices-demo/**'
     tags:
       - 'v*.*.*'
 
