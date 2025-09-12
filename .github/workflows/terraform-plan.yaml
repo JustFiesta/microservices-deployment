@@ -29,6 +29,9 @@ jobs:
 
         if: github.event.pull_request || (github.event.issue.pull_request && contains(github.event.comment.body, '/terraform plan'))
 
+        outputs:
+            status: ${{ steps.plan-status.outputs.status }}
+
         steps:
         - name: 'Checkout Repository'
           uses: actions/checkout@v5.0.0
@@ -57,13 +60,6 @@ jobs:
             terraform plan -out=tfplan.binary -no-color > tfplan.txt 2>&1
             terraform show -no-color tfplan.binary > tfplan.txt.plain 2>&1
 
-        - name: 'Upload Terraform Plan'
-          uses: actions/upload-artifact@v4.6.2
-          with:
-            name: terraform-plan
-            path: terraform/tfplan.binary
-            retention-days: 5
-
         - name: 'Check Terraform Plan Status'
           id: plan-status
           run: |
@@ -79,6 +75,13 @@ jobs:
               echo "Plan successful"
             fi
 
+        - name: 'Upload Terraform Plan'
+          uses: actions/upload-artifact@v4.6.2
+          with:
+            name: terraform-plan
+            path: terraform/tfplan.binary
+            retention-days: 5
+
         - name: Post Plan to PR Comment
           uses: actions/github-script@v7
           with:
@@ -91,7 +94,7 @@ jobs:
                 const statusMessages = {
                     'no-changes': '# ✅ No changes detected',
                     'error': '# ❌ Plan failed',
-                    'success': '# ✅ Plan successful - Review changes'
+                    'success': '# ✅ Plan successful'
                 };
 
                 const header = statusMessages[status] || '🔄 Plan completed';
@@ -113,6 +116,106 @@ jobs:
 
                 \`\`\`terraform
                 ${plan}
+                \`\`\`
+
+                </details>`;
+
+                github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    body: body
+                });
+    
+    terraform-apply:
+        name: 'Terraform Apply'
+        runs-on: ubuntu-latest
+        needs: terraform-plan
+
+        if: github.event.issue.pull_request && contains(github.event.comment.body, '/terraform apply') && needs.terraform-plan.outputs.status == 'success'
+
+        steps:
+        - name: 'Checkout Repository'
+          uses: actions/checkout@v5.0.0
+    
+        - name: 'Set up Terraform'
+          uses: hashicorp/setup-terraform@v3.1.2
+          with:
+            terraform_version: ${{ env.TF_VERSION }}
+    
+        - name: 'Configure AWS Credentials'
+          uses: aws-actions/configure-aws-credentials@v5.0.0
+          with:
+            aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+            aws-region: ${{ env.AWS_REGION }}
+
+        - name: 'Download Terraform Plan'
+          uses: actions/download-artifact@v5.0.0
+          with:
+            name: terraform-plan
+            path: terraform/tfplan.binary
+
+        - name: 'Terraform Init'
+          working-directory: ./terraform
+          run: terraform init
+
+        - name: 'Terraform Apply'
+          id: tf-apply
+          working-directory: ./terraform
+          run: terraform apply -auto-approve -no-color tfplan.binary > tfapply.txt 2>&1
+
+        - name: 'Check Terraform Apply Status'
+          id: apply-status
+          working-directory: ./terraform
+          run: |
+                if grep -q "Apply complete!" "tfapply.txt"; then
+                    echo "status=success" >> $GITHUB_OUTPUT
+                    echo "Apply successful"
+                elif grep -q "Error:\|error" "tfapply.txt"; then
+                    echo "status=error" >> $GITHUB_OUTPUT
+                    echo "Apply failed"
+                    exit 1
+                else
+                    echo "status=unknown" >> $GITHUB_OUTPUT
+                    echo "Apply status unknown"
+                fi
+
+        - name: 'Post Apply Comment'
+          uses: actions/github-script@v7
+          if: always()
+          with:
+            github-token: ${{ env.GH_TOKEN }}
+            script: |
+                const fs = require('fs');
+                const applyOutput = fs.readFileSync('terraform/tfapply.txt', 'utf8');
+                const status = '${{ steps.apply-status.outputs.status }}';
+
+                const statusMessages = {
+                    'success': '# ✅ Terraform apply completed successfully',
+                    'error': '# ❌ Terraform apply failed',
+                    'unknown': '# ⚠️ Terraform apply status unknown'
+                };
+
+                const header = statusMessages[status] || '# ⚠️ Terraform apply completed';
+
+                let issueNumber;
+                if (context.payload.pull_request) {
+                    issueNumber = context.payload.pull_request.number;
+                } else if (context.payload.issue) {
+                    issueNumber = context.payload.issue.number;
+                } else {
+                    core.setFailed('Could not determine issue number from context');
+                    return;
+                }
+
+                const body = `${header}
+
+                <details>
+                <summary>Click to expand</summary>
+
+                \`\`\`terraform
+                ${applyOutput}
                 \`\`\`
 
                 </details>`;
