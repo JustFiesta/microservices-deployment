@@ -63,11 +63,8 @@ jobs:
                 const output = `#### Terraform Initialization ⚙️\`${{ steps.tf-init.outcome }}\`
                 #### Terraform Plan 📖\`${{ steps.tf-plan.outcome }}\`
             
-                Show Plan
-                
+                Plan details:  
                 \`\`\`${process.env.PLAN}\`\`\`
-                
-                
                 
                 *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
                     
