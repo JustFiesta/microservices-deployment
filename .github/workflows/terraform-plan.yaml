@@ -40,20 +40,20 @@ jobs:
           id: detect-changes
           run: |
             CHANGED_ENVS=$(git diff --name-only origin/main...HEAD \
-              | grep '^terraform/environments/' \
-              | cut -d'/' -f3 \
-              | sort -u \
-              | jq -R . | jq -s .)
-
+                | grep '^terraform/environments/' \
+                | cut -d'/' -f3 \
+                | sort -u \
+                | jq -R . | jq -sc .)
+              
             if [ "$CHANGED_ENVS" = "null" ] || [ -z "$CHANGED_ENVS" ]; then
               CHANGED_ENVS="[]"
             fi
 
             CHANGED_MODULES=$(git diff --name-only origin/main...HEAD \
-              | grep '^terraform/modules/' \
-              | cut -d'/' -f3 \
-              | sort -u \
-              | jq -R . | jq -s .)
+                | grep '^terraform/modules/' \
+                | cut -d'/' -f3 \
+                | sort -u \
+                | jq -R . | jq -sc .)
 
             if [ "$CHANGED_MODULES" = "null" ] || [ -z "$CHANGED_MODULES" ]; then
               CHANGED_MODULES="[]"
