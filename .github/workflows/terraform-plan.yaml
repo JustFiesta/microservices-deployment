@@ -52,10 +52,10 @@ jobs:
           id: tf-plan
           working-directory: ./terraform
           run: |
-            terraform plan -no-color -out=tfplan.txt
+            terraform plan -no-color -out=tfplan.txt > tfplan.txt.tmp
 
             echo "plan<<EOF" >> $GITHUB_OUTPUT
-            cat tfplan.txt >> $GITHUB_OUTPUT
+            cat tfplan.txt.tmp >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
 
         - name: 'Upload Terraform Plan'
@@ -79,7 +79,6 @@ jobs:
               echo "status=success" >> $GITHUB_OUTPUT
               echo "Plan successful"
             fi
-        
 
         - name: Post Plan to PR
           if: github.event_name == 'pull_request'
@@ -92,7 +91,10 @@ jobs:
               ${{ steps.plan-status.outputs.status == 'error' && '# ❌ Plan failed' || '' }}
               ${{ steps.plan-status.outputs.status == 'success' && '# ✅ Plan successful - Review changes below' || '' }}
               
+              ## Complete plan output:
+              <details>
               ```terraform
               ${{ steps.tf-plan.outputs.plan }}
               ```
+              </details>
                 
