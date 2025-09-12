@@ -63,7 +63,5 @@ jobs:
           with:
             GITHUB_TOKEN: ${{ env.GH_TOKEN }}
             header: '## :terraform: Terraform Plan'
-            message: |
-              ```hcl
-              ${{ steps.tf-plan.outputs.stdout }}
-              ```
+            message: ${{ steps.tf-plan.outputs.stdout }}
+              
