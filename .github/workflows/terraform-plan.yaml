@@ -30,8 +30,11 @@ jobs:
           changed_modules: ${{ steps.detect-changes.outputs.changed_modules }}
 
         steps:
-        - name: 'Checkout Repository'
-          uses: actions/checkout@v5.0.0
+        - uses: actions/checkout@v5.0.0
+          with:
+            fetch-depth: 0
+            ref: ${{ github.head_ref }}
+        - run: git fetch origin main
         
         - name: 'Detect changes in environments'
           id: detect-changes
@@ -48,7 +51,7 @@ jobs:
 
             echo "====================================="
             echo "  Changed environments: $CHANGED_ENVS"
-            echo "  Changed environments: $CHANGED_MODULES"
+            echo "  Changed modules: $CHANGED_MODULES"
             echo "====================================="
 
             echo "changed_envs=$CHANGED_ENVS" >> $GITHUB_OUTPUT
