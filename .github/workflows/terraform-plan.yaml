@@ -53,7 +53,7 @@ jobs:
           id: tf-plan
           working-directory: ./terraform
           run: |
-            terraform plan > tfplan.txt
+            terraform plan -no-color > tfplan.txt
             cat tfplan.txt
         
         # TODO: post plan to PR as comment and update existing comment if already posted
