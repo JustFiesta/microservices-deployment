@@ -5,12 +5,18 @@
         * find services for build [DONE]
         * move config to one place (envs) [DONE]
     * scan with sec tools (Trivy, Checkov, Docker Scout) [DONE]
-    * outpu scans to Security tab on GitHub [IN PROGRESS]
-    * scan manifests with sec tools in pipeline [IN FUTURE]
+    * outpu scans to Security tab on GitHub [DONE]
+    * scan manifests with sec tools in pipeline [IN_FUTURE]
     * push images to repository [DONE]
-2. Contenerise each app for minimal image
+    * !!! Run pipeliene only for changed services!
+    * Correct the semver for different envs (push in CI as dev and then promote to others on approval)
+2. Contenerise each app for minimal image [DONE]
 3. Create GitHub Actions pipeline for infrastructure with GitOps approach
+    * Create TF pipelines (plan/apply with command support)
+    * Run only for changed envs
+    * Create pipeline for deploing K8 manifests/Kustomize/Helm files
 4. Create infrastructure on Cloud:
+    * TF S3 [DONE]
     * K8 cluster
     * IAM
 5. Enable K8 cluster to pull images from repository
