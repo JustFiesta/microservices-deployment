@@ -12,8 +12,8 @@
     * Correct the semver for different envs (push in CI as dev and then promote to others on approval)
 2. Contenerise each app for minimal image [DONE]
 3. Create GitHub Actions pipeline for infrastructure with GitOps approach
-    * Create TF pipelines (plan/apply with command support)
-    * Run only for changed envs
+    * Create TF pipelines (plan/apply with command support) [DONE]
+    * Give visability to apply with comment into PR somehow - maybe change to automatic apply if plan is good with comment on apply status and PR closing
     * Create pipeline for deploing K8 manifests/Kustomize/Helm files
 4. Create infrastructure on Cloud:
     * TF S3 [DONE]
