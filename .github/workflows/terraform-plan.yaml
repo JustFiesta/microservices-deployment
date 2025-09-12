@@ -52,10 +52,8 @@ jobs:
           id: tf-plan
           working-directory: ./terraform
           run: |
-            terraform plan -no-color -out=tfplan.txt > tfplan.out
-            echo "plan<<EOF" >> $GITHUB_OUTPUT
-            cat tfplan.out >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            terraform plan -out=tfplan.txt
+            terraform show -no-color tfplan.txt > tfplan.txt.plain
 
         - name: 'Upload Terraform Plan'
           uses: actions/upload-artifact@v4.6.2
@@ -67,10 +65,10 @@ jobs:
         - name: 'Check Terraform Plan Status'
           id: plan-status
           run: |
-            if grep -q "No changes" "terraform/tfplan.txt"; then
+            if grep -q "No changes" "terraform/tfplan.txt.plain"; then
               echo "status=no-changes" >> $GITHUB_OUTPUT
               echo "No changes in plan"
-            elif grep -q "error\|fail" "terraform/tfplan.txt"; then
+            elif grep -q "error\|fail" "terraform/tfplan.txt.plain"; then
               echo "status=error" >> $GITHUB_OUTPUT
               echo "Plan failed"
               exit 1
@@ -86,13 +84,13 @@ jobs:
             github-token: ${{ env.GH_TOKEN }}
             script: |
               const fs = require('fs');
-              const plan = fs.readFileSync('terraform/tfplan.out', 'utf8');
+              const plan = fs.readFileSync('terraform/tfplan.txt.plain', 'utf8');
 
               const status = '${{ steps.plan-status.outputs.status }}';
               let header = '';
-              if (status === 'no-changes') header = '✅ No changes detected in this plan';
-              else if (status === 'error') header = '❌ Plan failed';
-              else if (status === 'success') header = '✅ Plan successful - Review changes below';
+              if (status === 'no-changes') header = '# ✅ No changes detected in this plan';
+              else if (status === 'error') header = '# ❌ Plan failed';
+              else if (status === 'success') header = '# ✅ Plan successful - Review changes below';
 
               const body = `${header}
                 ## Complete plan output
