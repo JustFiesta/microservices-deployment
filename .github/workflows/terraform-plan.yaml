@@ -52,23 +52,23 @@ jobs:
           id: tf-plan
           working-directory: ./terraform
           run: |
-            terraform plan -out=tfplan.txt
-            terraform show -no-color tfplan.txt > tfplan.txt.plain
+            terraform plan -out=tfplan.binary -no-color > tfplan.txt 2>&1
+            terraform show -no-color tfplan.binary > tfplan.txt.plain 2>&1
 
         - name: 'Upload Terraform Plan'
           uses: actions/upload-artifact@v4.6.2
           with:
             name: terraform-plan
-            path: terraform/tfplan.txt
+            path: terraform/tfplan.binary
             retention-days: 5
 
         - name: 'Check Terraform Plan Status'
           id: plan-status
           run: |
-            if grep -q "No changes" "terraform/tfplan.txt.plain"; then
+            if grep -q "No changes" "terraform/tfplan.txt"; then
               echo "status=no-changes" >> $GITHUB_OUTPUT
               echo "No changes in plan"
-            elif grep -q "error\|fail" "terraform/tfplan.txt.plain"; then
+            elif grep -q "Plan failed\|Error\|error" "terraform/tfplan.txt"; then
               echo "status=error" >> $GITHUB_OUTPUT
               echo "Plan failed"
               exit 1
@@ -84,26 +84,43 @@ jobs:
             github-token: ${{ env.GH_TOKEN }}
             script: |
               const fs = require('fs');
-              const plan = fs.readFileSync('terraform/tfplan.txt.plain', 'utf8');
+              
+              const planOutput = fs.readFileSync('terraform/tfplan.txt', 'utf8');
+              const planFormatted = fs.readFileSync('terraform/tfplan.txt.plain', 'utf8');
 
               const status = '${{ steps.plan-status.outputs.status }}';
               let header = '';
-              if (status === 'no-changes') header = '# ✅ No changes detected in this plan';
-              else if (status === 'error') header = '# ❌ Plan failed';
-              else if (status === 'success') header = '# ✅ Plan successful - Review changes below';
+              let emoji = '';
+              
+              if (status === 'no-changes') {
+                header = 'No changes detected in this plan';
+                emoji = '✅';
+              } else if (status === 'error') {
+                header = 'Plan failed';
+                emoji = '❌';
+              } else if (status === 'success') {
+                header = 'Plan successful - Review changes below';
+                emoji = '✅';
+              }
 
-              const body = `${header}
-                ## Complete plan output
-                <details>
-                \`\`\`terraform
-                ${plan}
-                \`\`\`
-                </details>`;
+              const cleanPlan = planFormatted
+                .replace(/\u001b\[[0-9;]*m/g, '') // Usuń kody kolorów ANSI
+                .trim();
+
+              const body = `${emoji} **${header}**
+
+              <details>
+              <summary>Click to expand Terraform plan</summary>
+
+              \`\`\`terraform
+              ${cleanPlan}
+              \`\`\`
+
+              </details>`;
 
               await github.rest.issues.createComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: context.issue.number,
-                    body
+                    body: body
               });
-                
