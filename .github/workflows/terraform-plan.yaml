@@ -48,20 +48,52 @@ jobs:
           run: |
             terraform init
     
-        # TODO: save plan file to artifact for use in apply workflow
         - name: 'Terraform Plan'
           id: tf-plan
           working-directory: ./terraform
           run: |
             terraform plan -no-color > tfplan.txt
             cat tfplan.txt
+
+        - name: 'Upload Terraform Plan'
+          uses: actions/upload-artifact@v3
+          with:
+            name: terraform-plan
+            path: terraform/tfplan.txt
+            retention-days: 5
+
+        - name: 'Check Terraform Plan Status'
+          id: plan-status
+          run: |
+            if grep -q "No changes" "terraform/tfplan.txt"; then
+              echo "status=no-changes" >> $GITHUB_OUTPUT
+              echo "No changes in plan"
+            elif grep -q "error\|fail" "terraform/tfplan.txt"; then
+              echo "status=error" >> $GITHUB_OUTPUT
+              echo "Plan failed"
+              exit 1
+            else
+              echo "status=success" >> $GITHUB_OUTPUT
+              echo "Plan successful"
+            fi
         
-        # TODO: post plan to PR as comment and update existing comment if already posted
         - name: 'Post Plan to PR'
           if: github.event_name == 'pull_request'
           uses: marocchino/sticky-pull-request-comment@v2
           with:
             GITHUB_TOKEN: ${{ env.GH_TOKEN }}
             header: '## :terraform: Terraform Plan'
-            message: ${{ steps.tf-plan.outputs.stdout }}
+            message: |
+              # Terraform Plan
+              ${{ steps.plan-status.outputs.status == 'no-changes' && '✅ No changes detected in this plan' || '' }}
+              ${{ steps.plan-status.outputs.status == 'error' && '❌ Plan failed' || '' }}
+              ${{ steps.plan-status.outputs.status == 'success' && '✅ Plan successful - Review changes below' || '' }}
               
+              <details>
+              <summary>Click to expand</summary>
+              <br />
+              Format output as HCL
+              ```hcl
+              ${{ steps.tf-plan.outputs.stdout }}
+              ```
+                
