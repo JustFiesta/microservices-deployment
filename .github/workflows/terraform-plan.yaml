@@ -84,16 +84,15 @@ jobs:
             GITHUB_TOKEN: ${{ env.GH_TOKEN }}
             header: '## :terraform: Terraform Plan'
             message: |
-              # Terraform Plan
-              ${{ steps.plan-status.outputs.status == 'no-changes' && '✅ No changes detected in this plan' || '' }}
-              ${{ steps.plan-status.outputs.status == 'error' && '❌ Plan failed' || '' }}
-              ${{ steps.plan-status.outputs.status == 'success' && '✅ Plan successful - Review changes below' || '' }}
+              ${{ steps.plan-status.outputs.status == 'no-changes' && '# ✅ No changes detected in this plan' || '' }}
+              ${{ steps.plan-status.outputs.status == 'error' && '# ❌ Plan failed' || '' }}
+              ${{ steps.plan-status.outputs.status == 'success' && '# ✅ Plan successful - Review changes below' || '' }}
               
-              <details>
               <summary>Click to expand</summary>
+
+              <details>
               <br />
-              Format output as HCL
-              ```hcl
-              ${{ steps.tf-plan.outputs.stdout }}
-              ```
+                ```hcl
+                  ${{ steps.tf-plan.outputs.stdout }}
+                ```
                 
