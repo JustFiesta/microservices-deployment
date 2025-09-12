@@ -78,71 +78,38 @@ jobs:
               echo "status=success" >> $GITHUB_OUTPUT
               echo "Plan successful"
             fi
-
         - name: Post Plan to PR
           uses: actions/github-script@v7
           with:
             github-token: ${{ env.GH_TOKEN }}
             script: |
-              const fs = require('fs');
-              
-              let planOutput = '';
-              let planFormatted = '';
-              
-              try {
-                planOutput = fs.readFileSync('terraform/tfplan.txt', 'utf8');
-              } catch (error) {
-                planOutput = 'Error: Could not read plan output';
-              }
-              
-              try {
-                planFormatted = fs.readFileSync('terraform/tfplan.txt.plain', 'utf8');
-              } catch (error) {
-                planFormatted = 'Error: Could not read formatted plan';
-              }
+                const fs = require('fs');
+                const plan = fs.readFileSync('terraform/tfplan.txt.plain', 'utf8');
+                const status = '${{ steps.plan-status.outputs.status }}';
 
-              const status = '${{ steps.plan-status.outputs.status }}';
-              let header = '';
-              let emoji = '';
-              
-              if (status === 'no-changes') {
-                header = 'No changes detected in this plan';
-                emoji = '✅';
-              } else if (status === 'error') {
-                header = 'Plan failed';
-                emoji = '❌';
-              } else if (status === 'success') {
-                header = 'Plan successful - Review changes below';
-                emoji = '✅';
-              } else {
-                header = 'Plan execution completed';
-                emoji = '🔄';
-              }
+                const statusMessages = {
+                    'no-changes': '# ✅ No changes detected',
+                    'error': '# ❌ Plan failed',
+                    'success': '# ✅ Plan successful - Review changes'
+                };
 
-              const cleanPlan = planFormatted
-                .replace(/\u001b\[[0-9;]*m/g, '') // Usuń kody kolorów ANSI
-                .trim();
+                const header = statusMessages[status] || '🔄 Plan completed';
+                const issueNumber = github.event.pull_request?.number || github.event.issue?.number;
 
-              const triggerInfo = github.event_name === 'issue_comment' 
-                ? `\n> Triggered by comment from @${github.event.comment.user.login}` 
-                : '';
+                const body = `## Terraform Plan - ${header}
 
-              const body = `${emoji} **${header}**${triggerInfo}
+                <details>
+                <summary>Click to expand</summary>
 
-              <details>
-              <summary>Click to expand Terraform plan</summary>
+                \`\`\`terraform
+                ${plan}
+                \`\`\`
 
-              \`\`\`terraform
-              ${cleanPlan}
-              \`\`\`
+                </details>`;
 
-              </details>`;
-
-              const prNumber = github.event_name === 'pull_request' 
-                ? github.event.pull_request.number 
-
-              await github.rest.issues.createComment({
+                github.rest.issues.createComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
+                    issue_number: issueNumber,
                     body: body
-              });
+                });
