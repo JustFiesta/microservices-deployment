@@ -17,7 +17,7 @@ env:
 
 jobs:
     terraform-apply:
-        name: 'Terraform Plan'
+        name: 'Terraform Apply'
         runs-on: ubuntu-latest
 
         steps:
@@ -47,29 +47,6 @@ jobs:
           working-directory: ./terraform
           run: |
             terraform plan -no-color
-
-        - name: Add Plan Comment (Apply)
-          id: comment
-          uses: actions/github-script@v6
-          env:
-            PLAN: "terraform\n${{ steps.tf-plan.outputs.stdout }}"
-          with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-                const output = `#### Terraform Initialization ⚙️\`${{ steps.tf-init.outcome }}\`
-                #### Terraform Plan 📖\`${{ steps.tf-plan.outcome }}\`
-            
-                Plan details:  
-                \`\`\`${process.env.PLAN}\`\`\`
-                
-                *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
-                    
-                github.rest.issues.createComment({
-                    issue_number: context.issue.number,
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    body: output
-                })
 
         - name: Terraform Apply
           id: apply
