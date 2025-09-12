@@ -1,0 +1,92 @@
+name: 'Terraform Plan'
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+  issue_comment:
+    types: [created]
+
+env:
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCESS_KEY_ID : ${{ secrets.AWS_ACCESS_KEY_ID  }}
+  AWS_SECRET_ACCESS_KEY : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  
+  TF_VERSION: '1.13.1'
+  TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+  
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+    discover-environments:
+        name: 'Discover Environments'
+        runs-on: ubuntu-latest
+
+        outputs:
+          environments: ${{ steps.set-envs.outputs.envs }}
+
+        steps:
+        - name: 'Checkout Repository'
+          uses: actions/checkout@v5.0.0
+
+        - name: 'Set Environments'
+          id: set-envs
+          run: |
+            echo "envs=$(ls -d terraform/*/ | xargs -n 1 basename | jq -R . | jq -s .)" >> $GITHUB_OUTPUT
+
+            echo "====================================="
+            echo "    Detected environments: $envs"
+            echo "====================================="
+      
+    # terraform-plan:
+    #     name: 'Terraform Plan'
+    #     runs-on: ubuntu-latest
+
+    #     if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/terraform plan'))
+        
+    #     strategy:
+    #       matrix:
+    #         environment: ${{ fromJson(needs.discover-environments.outputs.environments) }}
+
+    #     steps:
+    #     - name: 'Checkout Repository'
+    #       uses: actions/checkout@v5.0.0
+    
+    #     - name: 'Set up Terraform'
+    #       uses: hashicorp/setup-terraform@v3.1.2
+    #       with:
+    #         terraform_version: ${{ env.TF_VERSION }}
+    
+    #     - name: 'Configure AWS Credentials'
+    #       uses: aws-actions/configure-aws-credentials@v5.0.0
+    #       with:
+    #         aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+    #         aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+    #         aws-region: ${{ env.AWS_REGION }}
+    
+    #     # TODO: paths for each environment
+    #     - name: 'Terraform Init'
+    #       working-directory: ./terraform
+    #       run: |
+    #         terraform init
+    
+    #     # TODO: paths for each environment
+    #     # TODO: save plan file to artifact for use in apply workflow
+    #     - name: 'Terraform Plan'
+    #       id: tf-plan
+    #       working-directory: ./terraform
+    #       run: |
+    #         terraform plan > tfplan.txt
+    #         cat tfplan.txt
+        
+    #     - name: 'Post Plan Comment'
+    #       if: steps.tf-plan.outcome == 'success'
+    #       uses: marocchino/sticky-pull-request-comment@v2
+    #       with:
+    #         GITHUB_TOKEN: ${{ env.GH_TOKEN }}
+    #         header: '## :terraform: Terraform Plan'
+    #         message-file: ./terraform/tfplan.txt
+    #         replace-existing-comment: true
