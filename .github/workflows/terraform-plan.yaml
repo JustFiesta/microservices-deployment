@@ -106,7 +106,7 @@ jobs:
                     return;
                 }
 
-                const body = `## Terraform Plan - ${header}
+                const body = `${header}
 
                 <details>
                 <summary>Click to expand</summary>
