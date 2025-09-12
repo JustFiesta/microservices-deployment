@@ -52,7 +52,7 @@ jobs:
           id: tf-plan
           working-directory: ./terraform
           run: |
-            terraform plan -no-color > tfplan.txt
+            terraform plan -no-color -out=tfplan.txt
 
             echo "plan<<EOF" >> $GITHUB_OUTPUT
             cat tfplan.txt >> $GITHUB_OUTPUT
