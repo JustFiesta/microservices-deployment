@@ -140,11 +140,9 @@ jobs:
 
               const prNumber = github.event_name === 'pull_request' 
                 ? github.event.pull_request.number 
-                : github.event.issue.number;
 
               await github.rest.issues.createComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    issue_number: prNumber,
                     body: body
               });
