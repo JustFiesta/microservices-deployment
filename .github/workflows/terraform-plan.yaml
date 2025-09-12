@@ -21,98 +21,49 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-    discover-environments:
-        name: 'Discover Environments'
+    terraform-plan:
+        name: 'Terraform Plan'
         runs-on: ubuntu-latest
 
-        outputs:
-          changed_envs: ${{ steps.detect-changes.outputs.changed_envs }}
-          changed_modules: ${{ steps.detect-changes.outputs.changed_modules }}
+        if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/terraform plan'))
 
         steps:
-        - uses: actions/checkout@v5.0.0
+        - name: 'Checkout Repository'
+          uses: actions/checkout@v5.0.0
+    
+        - name: 'Set up Terraform'
+          uses: hashicorp/setup-terraform@v3.1.2
           with:
-            fetch-depth: 0
-            ref: ${{ github.head_ref }}
-        - run: git fetch origin main
-        
-        - name: 'Detect changes in environments'
-          id: detect-changes
+            terraform_version: ${{ env.TF_VERSION }}
+    
+        - name: 'Configure AWS Credentials'
+          uses: aws-actions/configure-aws-credentials@v5.0.0
+          with:
+            aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+            aws-region: ${{ env.AWS_REGION }}
+    
+        - name: 'Terraform Init'
+          working-directory: ./terraform
           run: |
-            CHANGED_ENVS=$(git diff --name-only origin/main...HEAD \
-                | grep '^terraform/environments/' \
-                | cut -d'/' -f3 \
-                | sort -u \
-                | jq -R . | jq -sc .)
-              
-            if [ "$CHANGED_ENVS" = "null" ] || [ -z "$CHANGED_ENVS" ]; then
-              CHANGED_ENVS="[]"
-            fi
-
-            CHANGED_MODULES=$(git diff --name-only origin/main...HEAD \
-                | grep '^terraform/modules/' \
-                | cut -d'/' -f3 \
-                | sort -u \
-                | jq -R . | jq -sc .)
-
-            if [ "$CHANGED_MODULES" = "null" ] || [ -z "$CHANGED_MODULES" ]; then
-              CHANGED_MODULES="[]"
-            fi
-
-            echo "====================================="
-            echo "  Changed environments: $CHANGED_ENVS"
-            echo "  Changed modules: $CHANGED_MODULES"
-            echo "====================================="
-
-            echo "changed_envs=$CHANGED_ENVS" >> $GITHUB_OUTPUT
-            echo "changed_modules=$CHANGED_MODULES" >> $GITHUB_OUTPUT
-            
-    # terraform-plan:
-    #     name: 'Terraform Plan'
-    #     runs-on: ubuntu-latest
-
-    #     if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/terraform plan'))
+            terraform init
+    
+        # TODO: save plan file to artifact for use in apply workflow
+        - name: 'Terraform Plan'
+          id: tf-plan
+          working-directory: ./terraform
+          run: |
+            terraform plan > tfplan.txt
+            cat tfplan.txt
         
-    #     strategy:
-    #       matrix:
-    #         environment: ${{ fromJson(needs.discover-environments.outputs.environments) }}
-
-    #     steps:
-    #     - name: 'Checkout Repository'
-    #       uses: actions/checkout@v5.0.0
-    
-    #     - name: 'Set up Terraform'
-    #       uses: hashicorp/setup-terraform@v3.1.2
-    #       with:
-    #         terraform_version: ${{ env.TF_VERSION }}
-    
-    #     - name: 'Configure AWS Credentials'
-    #       uses: aws-actions/configure-aws-credentials@v5.0.0
-    #       with:
-    #         aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-    #         aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-    #         aws-region: ${{ env.AWS_REGION }}
-    
-    #     # TODO: paths for each environment
-    #     - name: 'Terraform Init'
-    #       working-directory: ./terraform
-    #       run: |
-    #         terraform init
-    
-    #     # TODO: paths for each environment
-    #     # TODO: save plan file to artifact for use in apply workflow
-    #     - name: 'Terraform Plan'
-    #       id: tf-plan
-    #       working-directory: ./terraform
-    #       run: |
-    #         terraform plan > tfplan.txt
-    #         cat tfplan.txt
-        
-    #     - name: 'Post Plan Comment'
-    #       if: steps.tf-plan.outcome == 'success'
-    #       uses: marocchino/sticky-pull-request-comment@v2
-    #       with:
-    #         GITHUB_TOKEN: ${{ env.GH_TOKEN }}
-    #         header: '## :terraform: Terraform Plan'
-    #         message-file: ./terraform/tfplan.txt
-    #         replace-existing-comment: true
+        # TODO: post plan to PR as comment and update existing comment if already posted
+        - name: 'Post Plan to PR'
+          if: github.event_name == 'pull_request'
+          uses: marocchino/sticky-pull-request-comment@v2
+          with:
+            GITHUB_TOKEN: ${{ env.GH_TOKEN }}
+            header: '## :terraform: Terraform Plan'
+            message: |
+              ```hcl
+              ${{ steps.tf-plan.outputs.stdout }}
+              ```
