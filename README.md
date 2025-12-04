@@ -1,10 +1,10 @@
-﻿# Docker + Kubernetes deployment
+﻿# Microservices Deployment
 
 This repository contains resources for successful deployment of [microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) project.
 
 It was made as a practical task to test my knowlage for containers creation/security and Kubernetes on Cloud. All complaining with DevOps principals.
 
-The deployment is fully Automated with CI/CD.
+The deployment is fully Automated with CI/CD for code and also for Terraform files.
 
 ## Technologies
 
@@ -43,3 +43,4 @@ The deployment is fully Automated with CI/CD.
 5. Setup ArgoCD in Kubernetes Cluster
 6. Reapply code - make some sample change in microserives-demo/src/
 7. Reapply Kubernetes manifests - change their version to correct ones from ECR
+
