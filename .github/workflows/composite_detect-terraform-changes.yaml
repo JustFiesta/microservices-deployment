@@ -27,11 +27,15 @@ jobs:
     - name: 'Detect Changed Environments'
       id: detect
       run: |
-        # Pobierz listę zmienionych plików
         if [ "${{ github.event_name }}" == "pull_request" ]; then
           changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
         else
-          changed_files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          if [ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]; then
+            changed_files=$(git diff --name-only origin/main...${{ github.sha }})
+          else
+            # Normalny push - porównaj z poprzednim commitem
+            changed_files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          fi
         fi
         
         echo "Changed files:"
