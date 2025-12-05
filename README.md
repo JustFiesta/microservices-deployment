@@ -8,7 +8,7 @@ The deployment is fully Automated with CI/CD for code and also for Terraform fil
 
 ## Statuses
 
-[![Terraform Apply](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml) [![Build](https://github.com/JustFiesta/microservices-deployment/actions/workflows/image-ci.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/image-ci.yaml)
+[![Terraform Apply](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml) [![Build](https://github.com/JustFiesta/microservices-deployment/actions/workflows/ci.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/ci.yaml)
 
 ## Technologies
 

@@ -1,0 +1,93 @@
+name: 'Terraform Validate'
+description: 'Validate Terraform configuration'
+
+inputs:
+  working-directory:
+    description: 'The working directory for Terraform commands'
+    required: false
+    default: '.'
+  plan-file:
+    description: 'The name of the Terraform plan file'
+    required: false
+    default: 'tfplan'
+
+outputs:
+  plan-file:
+    description: 'Path to the plan file'
+    value: ${{ inputs.working-directory }}/${{ inputs.plan-file }}
+  plan-output:
+    description: 'Path to the plan output file'
+    value: ${{ inputs.working-directory }}/plan.out
+  plan-content:
+    description: 'Rendered Terraform plan (text)'
+    value: ${{ steps.plan_content.outputs.text }}
+  plan-summary:
+    description: 'Short summary of Terraform plan'
+    value: ${{ steps.plan_summary.outputs.summary }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Terraform Init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform init
+
+    - name: Terraform Validate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform validate
+
+    - name: Terraform Plan
+      id: plan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        terraform plan -no-color -input=false -out=${{ inputs.plan-file }}
+        terraform show -no-color ${{ inputs.plan-file }} > plan.out
+
+    - name: Extract Plan Summary
+      id: plan_summary
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Wyciągnij tylko ostatnie linie z podsumowaniem (Plan: X to add, Y to change, Z to destroy)
+        summary=$(grep -A 10 "Plan:" plan.out | head -15)
+        
+        # Jeśli nie ma "Plan:", sprawdź czy są w ogóle zmiany
+        if [ -z "$summary" ]; then
+          if grep -q "No changes" plan.out; then
+            summary="No changes. Your infrastructure matches the configuration."
+          else
+            summary=$(tail -20 plan.out)
+          fi
+        fi
+        
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        echo "$summary" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Upload plan artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-plan-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ inputs.working-directory }}/plan.out
+        retention-days: 1
+
+    - name: Export plan content
+      id: plan_content
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Ogranicz do max 65000 znaków (limit GitHub)
+        plan_content=$(cat plan.out | head -c 65000)
+        
+        if [ ${#plan_content} -ge 65000 ]; then
+          plan_content="${plan_content}
+
+          ... (output truncated - check artifact for full plan)"
+        fi
+        
+        echo "text<<EOF" >> $GITHUB_OUTPUT
+        echo "$plan_content" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT

@@ -3,53 +3,57 @@ name: 'Terraform Apply'
 on:
   push:
     branches: 
-        - 'main'
+      - 'main'
     paths:
       - 'terraform/environments/**'
       - 'terraform/modules/**'
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCESS_KEY_ID : ${{ secrets.AWS_ACCESS_KEY_ID  }}
-  AWS_SECRET_ACCESS_KEY : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
   TF_VERSION: ${{ secrets.TERRAFORM_VERSION }}
+  TF_LOG: INFO
   TF_INPUT: false
 
 jobs:
-    terraform-apply:
-        name: 'Terraform Apply'
-        runs-on: ubuntu-latest
+  detect-changes:
+    uses: ./.github/workflows/composite_detect-terraform-changes.yaml
 
-        steps:
-        - name: 'Checkout Repository'
-          uses: actions/checkout@v5.0.0
-    
-        - name: 'Set up Terraform'
-          uses: hashicorp/setup-terraform@v3.1.2
-          with:
-            terraform_version: ${{ env.TF_VERSION }}
-    
-        - name: 'Configure AWS Credentials'
-          uses: aws-actions/configure-aws-credentials@v5.0.0
-          with:
-            aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-            aws-region: ${{ env.AWS_REGION }}
-    
-        - name: 'Terraform Init'
-          id: tf-init
-          working-directory: ./terraform
-          run: |
-            terraform init
-    
-        - name: Terraform Plan
-          id: tf-plan
-          working-directory: ./terraform
-          run: |
-            terraform plan -no-color
+  terraform-apply:
+    name: 'Terraform Apply - ${{ matrix.environment }}'
+    runs-on: ubuntu-latest
 
-        - name: Terraform Apply
-          id: apply
-          working-directory: ./terraform
-          run: terraform apply -auto-approve
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ fromJson(needs.detect-changes.outputs.environments) }}
+
+    steps:
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v5.0.0
+
+    - name: 'Set up Terraform'
+      uses: hashicorp/setup-terraform@v3.1.2
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: 'Configure AWS Credentials'
+      uses: aws-actions/configure-aws-credentials@v5.0.0
+      with:
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Terraform Basic Actions (Init, Validate, Plan)
+      uses: ./.github/actions/terraform-init-validate-plan
+      with:
+        working-directory: terraform/environments/${{ matrix.environment }}
+
+    - name: Terraform Apply
+      working-directory: terraform/environments/${{ matrix.environment }}
+      run: terraform apply -auto-approve tfplan
