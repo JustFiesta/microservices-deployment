@@ -1,4 +1,4 @@
-name: 'Terraform Check and Plan'
+name: 'Terraform Integration Check'
 
 on:
   pull_request:
@@ -24,10 +24,11 @@ env:
 
 jobs:
   detect-changes:
+    name: 'Detect Changed Environments'
     uses: ./.github/workflows/composite_detect-terraform-changes.yaml
 
   terraform-fmt:
-    name: 'Terraform Format'
+    name: 'Terraform Format Files'
     runs-on: ubuntu-latest
 
     steps:
@@ -59,7 +60,7 @@ jobs:
         git commit -m "style: Auto-format Terraform files"
         git push
 
-  terraform-check:
+  terraform-plan:
     name: 'Terraform Validate & Plan - ${{ matrix.environment }}'
     runs-on: ubuntu-latest
 
