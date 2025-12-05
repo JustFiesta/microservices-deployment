@@ -2,7 +2,7 @@
 
 ## 🚀 Features
 
-### 1. Automatic Image Build & Security Scan (`image-ci.yaml`)
+### 1. Automatic Image Build & Security Scan (`ci.yaml`)
 
 **Triggers**:
 
@@ -15,26 +15,6 @@
 - Scans images for vulnerabilities using Docker Scout and Trivy
 - Uploads scan results to the GitHub Security tab (SARIF format)
 - Ensures images are buildable and secure before merging
-
-### 2. Continuous Delivery to Registry (`image-cd.yaml`)
-
-**Triggers**:
-
-- On every push of a release tag matching `v*.*.*` (e.g., `v1.2.3`)
-
-**What it does**:
-
-- Discovers all microservices with a `Dockerfile` in `microservices-demo/src/`
-- Builds and pushes Docker images for each service to Amazon ECR
-- Tags images with both the release version and `latest`
-- Uses AWS credentials and role assumption for secure registry access
-
-## 🎯 Available Actions
-
-| Workflow      | Trigger                      | Description                                      |
-|---------------|-----------------------------|--------------------------------------------------|
-| CI (`image-ci.yaml`) | PR to `main` branch           | Build and scan images, upload results to Security |
-| CD (`image-cd.yaml`) | Push tag `v*.*.*`              | Build and push images to ECR registry             |
 
 ## ⚙️ Required GitHub Secrets
 
