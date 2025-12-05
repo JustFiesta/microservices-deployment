@@ -1,7 +1,7 @@
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "cluster" {
-  name                 = var.cluster_role_name
+  name                 = local.cluster_role
   permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/DefaultBoundaryPolicy"
 
   assume_role_policy = jsonencode({
@@ -15,7 +15,7 @@ resource "aws_iam_role" "cluster" {
     }]
   })
 
-  tags = var.tags
+  tags = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_policies" {
@@ -32,7 +32,7 @@ resource "aws_iam_role_policy_attachment" "cluster_policies" {
 }
 
 resource "aws_iam_role" "node" {
-  name                 = var.node_role_name
+  name                 = local.node_role
   permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/DefaultBoundaryPolicy"
 
   assume_role_policy = jsonencode({
@@ -46,7 +46,7 @@ resource "aws_iam_role" "node" {
     }]
   })
 
-  tags = var.tags
+  tags = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "node_policies" {
@@ -60,7 +60,7 @@ resource "aws_iam_role_policy_attachment" "node_policies" {
 }
 
 resource "aws_iam_role" "ebs_csi_driver" {
-  name                 = "${var.cluster_name}-ebs-csi-driver-role"
+  name                 = "${local.cluster_name}-ebs-csi-driver-role"
   permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/DefaultBoundaryPolicy"
 
   assume_role_policy = jsonencode({
@@ -78,9 +78,9 @@ resource "aws_iam_role" "ebs_csi_driver" {
   })
 
   tags = merge(
-    var.tags,
+    local.tags,
     {
-      Name = "${var.cluster_name}-ebs-csi-driver-role"
+      Name = "${local.cluster_name}-ebs-csi-driver-role"
     }
   )
 }
@@ -96,5 +96,5 @@ resource "aws_eks_pod_identity_association" "ebs_csi_driver" {
   service_account = "ebs-csi-controller-sa"
   role_arn        = aws_iam_role.ebs_csi_driver.arn
 
-  tags = var.tags
+  tags = local.tags
 }
