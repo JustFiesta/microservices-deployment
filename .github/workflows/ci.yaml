@@ -5,12 +5,12 @@ on:
     branches:
       - main
     paths:
-      - 'microservices-demo/**'
+      - 'microservices-demo/src/**'
 
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # automatically provided by GitHub Actions
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
 
 jobs:
   discover_services:
@@ -37,6 +37,37 @@ jobs:
           echo "====================================="
           echo "services=$SERVICES_JSON" >> "$GITHUB_OUTPUT"
 
+  create_sem_ver: 
+    needs: discover_services
+    if: ${{ needs.discover_services.outputs.services != '[]' }}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.discover_services.outputs.services) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create version tag
+        id: create_version_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SERVICE_NAME: ${{ matrix.service }}
+        run: |
+          CURRENT_VERSION_TAG=$(git ls-remote --tags origin "refs/tags/${SERVICE_NAME}-v*" | awk -F'/' '{print $3}' | sort -V | tail -n1)
+          if [ -z "$CURRENT_VERSION_TAG" ]; then
+            NEW_VERSION_TAG="${SERVICE_NAME}-v1.0.0"
+          else
+            VERSION_NUMBER=${CURRENT_VERSION_TAG#${SERVICE_NAME}-v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUMBER"
+            PATCH=$((PATCH + 1))
+            NEW_VERSION_TAG="${SERVICE_NAME}-v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          echo "New version tag for service ${SERVICE_NAME}: $NEW_VERSION_TAG"
+          echo "version_tag=$NEW_VERSION_TAG" >> "$GITHUB_OUTPUT"
+
   build_and_scan:
     needs: discover_services
     if: ${{ needs.discover_services.outputs.services != '[]' }}
@@ -61,36 +92,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_PASSWORD }}
-
-      - name: Build Docker image (no push)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./microservices-demo/src/${{ matrix.service }}
-          file: ./microservices-demo/src/${{ matrix.service }}/Dockerfile
-          platforms: linux/amd64
-          push: false
-          load: true
-          tags: |
-            ${{ env.IMAGE_TAG }}
-
-      - name: Docker Scout
-        uses: docker/scout-action@v1
-        with:
-          command: cves
-          image: local://${{ env.IMAGE_TAG }}
-          sarif-file: sarif.output.json
-          summary: true
-
-      - name: Upload Docker Scout SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: sarif.output.json
-
       - name: Trivy scan
         uses: aquasecurity/trivy-action@0.28.0
         with:
@@ -106,3 +107,26 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./microservices-demo/src/${{ matrix.service }}
+          file: ./microservices-demo/src/${{ matrix.service }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.ref_name }}
+            ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:latest

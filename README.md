@@ -6,6 +6,10 @@ It was made as a practical task to test my knowlage for containers creation/secu
 
 The deployment is fully Automated with CI/CD for code and also for Terraform files.
 
+## Statuses
+
+[![Terraform Apply](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml) [![Build](https://github.com/JustFiesta/microservices-deployment/actions/workflows/image-ci.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/image-ci.yaml)
+
 ## Technologies
 
 * Docker
