@@ -1,6 +1,10 @@
 name: 'Terraform Check and Plan'
 
 on:
+  pull_request:
+    paths:
+      - 'terraform/environments/**'
+      - 'terraform/modules/**'
   push:
     branches: 
       - '*'
