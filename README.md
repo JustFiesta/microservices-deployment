@@ -12,6 +12,7 @@ The deployment is fully Automated with CI/CD for code and also for Terraform fil
 
 ## Technologies
 
+* GitHub Actions
 * Docker
 * AWS
 * Terraform
