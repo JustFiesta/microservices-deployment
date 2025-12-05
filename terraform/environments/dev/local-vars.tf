@@ -7,7 +7,7 @@ locals {
   }
 
   vpc_name      = "${local.project_name}-vpc"
-  cluster_name  = "${local.project_name}-cluster"
+  cluster_name  = "${local.project_name}"
   cluster_role  = "${local.project_name}-cluster-role"
   node_role     = "${local.project_name}-node-role"
 }
