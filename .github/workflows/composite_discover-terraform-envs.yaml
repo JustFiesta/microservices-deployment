@@ -1,0 +1,29 @@
+name: Discover Terraform Environments
+
+on:
+  workflow_call:
+    outputs:
+      environments:
+        description: "JSON array of discovered Terraform environment names"
+        value: ${{ jobs.discover-environments.outputs.environments }}
+
+jobs:
+  discover-environments:
+    name: Discover Terraform Environments
+    runs-on: ubuntu-latest
+
+    outputs:
+      environments: ${{ steps.discover.outputs.environments }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Discover Environments
+        id: discover
+        run: |
+          ENVIRONMENTS=$(find terraform/environments -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R . | jq -sc .)
+          echo "====================================="
+          echo "  Discovered environments: $ENVIRONMENTS"
+          echo "====================================="
+          echo "environments=$ENVIRONMENTS" >> "$GITHUB_OUTPUT"
