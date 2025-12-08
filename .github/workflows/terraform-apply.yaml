@@ -19,7 +19,7 @@ env:
 
 jobs:
   detect-changes:
-    uses: ./.github/workflows/composite_detect-terraform-changes.yaml
+    uses: ./.github/workflows/reusable_detect-terraform-changes.yaml
 
   terraform-apply:
     name: 'Terraform Apply - ${{ matrix.environment }}'
