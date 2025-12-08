@@ -25,7 +25,7 @@ env:
 jobs:
   detect-changes:
     name: 'Detect Changed Environments'
-    uses: ./.github/workflows/composite_detect-terraform-changes.yaml
+    uses: ./.github/workflows/reusable_detect-terraform-changes.yaml
 
   terraform-fmt:
     name: 'Terraform Format Files'

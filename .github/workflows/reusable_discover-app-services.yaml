@@ -1,0 +1,36 @@
+name: Discover Microservices
+
+on:
+  workflow_call:
+    outputs:
+      services:
+        description: "JSON array of discovered microservice names"
+        value: ${{ jobs.discover-services.outputs.services }}
+
+jobs:
+  discover-services:
+    name: Discover Microservices
+    runs-on: ubuntu-latest
+
+    outputs:
+      services: ${{ steps.discover.outputs.services }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Discover Services
+        id: discover
+        run: |
+          SERVICES=$(find microservices-demo/src -mindepth 1 -maxdepth 2 -type d -exec test -f "{}/Dockerfile" \; -print | xargs -n1 basename || true)
+          if [ -z "$SERVICES" ]; then
+            echo "No Dockerfiles found in microservices-demo/src"
+            SERVICES_JSON="[]"
+          else
+            SERVICES_JSON=$(echo "$SERVICES" | jq -R . | jq -sc .)
+          fi
+          
+          echo "====================================="
+          echo "  Detected services: $SERVICES_JSON"
+          echo "====================================="
+          echo "services=$SERVICES_JSON" >> "$GITHUB_OUTPUT"
