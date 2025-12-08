@@ -10,7 +10,6 @@ env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
 
 jobs:
   discover-environments:
@@ -54,32 +53,57 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Get ECR Registry URL
+        id: get-ecr-registry
+        run: |
+          # Convert environment name to uppercase for variable name
+          ENV_UPPER=$(echo "${{ matrix.environment }}" | tr '[:lower:]' '[:upper:]')
+          ECR_VAR_NAME="${ENV_UPPER}_ECR_REGISTRY"
+
+          # Get ECR registry URL from GitHub variables
+          ECR_REGISTRY_URL="${!ECR_VAR_NAME}"
+
+          if [ -z "$ECR_REGISTRY_URL" ]; then
+            echo "ERROR: GitHub variable ${ECR_VAR_NAME} is not set"
+            echo "Please set ${ECR_VAR_NAME} in repository variables with the ECR registry URL"
+            echo "ecr_registry_exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Using ECR registry: $ECR_REGISTRY_URL"
+          echo "ecr_registry_url=$ECR_REGISTRY_URL" >> "$GITHUB_OUTPUT"
+          echo "ecr_registry_exists=true" >> "$GITHUB_OUTPUT"
+
       - name: Get ECR Image URI
         id: get-image
+        if: steps.get-ecr-registry.outputs.ecr_registry_exists == 'true'
         run: |
-          # Construct ECR image URI for this environment and service
-          ECR_REPO="${ECR_REGISTRY}/${{ matrix.environment }}-${{ matrix.service }}"
+          ECR_REGISTRY_URL="${{ steps.get-ecr-registry.outputs.ecr_registry_url }}"
+          REPO_NAME="${{ matrix.environment }}-${{ matrix.service }}"
 
-          # Check if repository exists and get latest image
-          if aws ecr describe-repositories --repository-names "${{ matrix.environment }}-${{ matrix.service }}" --region ${{ env.AWS_REGION }} 2>/dev/null; then
+          # Construct full image URI
+          IMAGE_URI="${ECR_REGISTRY_URL}/${REPO_NAME}"
+
+          # Check if repository exists in ECR and get latest image
+          if aws ecr describe-repositories --repository-names "${REPO_NAME}" --region ${{ env.AWS_REGION }} 2>/dev/null; then
             # Get the latest image tag
             LATEST_TAG=$(aws ecr describe-images \
-              --repository-name "${{ matrix.environment }}-${{ matrix.service }}" \
+              --repository-name "${REPO_NAME}" \
               --region ${{ env.AWS_REGION }} \
               --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
               --output text)
 
             if [ "$LATEST_TAG" != "None" ] && [ -n "$LATEST_TAG" ]; then
-              IMAGE_URI="${ECR_REPO}:${LATEST_TAG}"
-              echo "Found image: $IMAGE_URI"
-              echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+              FULL_IMAGE_URI="${IMAGE_URI}:${LATEST_TAG}"
+              echo "Found image: $FULL_IMAGE_URI"
+              echo "image_uri=$FULL_IMAGE_URI" >> "$GITHUB_OUTPUT"
               echo "image_exists=true" >> "$GITHUB_OUTPUT"
             else
-              echo "No tagged images found in repository ${{ matrix.environment }}-${{ matrix.service }}"
+              echo "No tagged images found in repository ${REPO_NAME}"
               echo "image_exists=false" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "Repository ${{ matrix.environment }}-${{ matrix.service }} does not exist"
+            echo "Repository ${REPO_NAME} does not exist in ECR registry"
             echo "image_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
