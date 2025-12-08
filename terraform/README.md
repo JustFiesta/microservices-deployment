@@ -84,6 +84,12 @@ The Terraform CI/CD pipelines automatically discover all environments in `terraf
 
 No additional pipeline configuration needed.
 
+### 7. Add ECR secret for created environment
+
+Pipelines for security and CI reqiure destigneted ECR variables per environment in given convention: `<ENV_NAME>_ECR_REGISTRY`, eg. `DEV_ECR_REGISTRY`.
+
+This enables them to check correcponsind environment repository - without them they will not work.
+
 ## How to connect to EKS
 
 ```shell
