@@ -59,29 +59,42 @@ jobs:
       - name: Get ECR Image URI
         id: get-image
         run: |
-          # Construct ECR image URI for this environment and service
-          ECR_REPO="${ECR_REGISTRY_URI}/${{ matrix.environment }}-${{ matrix.service }}"
-
+          # Construct ECR image URI for this service
+          # Format: registry/project-name/service:tag
+          SERVICE_REPO="${{ matrix.service }}"
+          
           # Check if repository exists and get latest image
-          if aws ecr describe-repositories --repository-names "${{ matrix.environment }}-${{ matrix.service }}" --region ${{ env.AWS_REGION }} 2>/dev/null; then
-            # Get the latest image tag
+          if aws ecr describe-repositories --repository-names "mbocak-microservices-demo/${SERVICE_REPO}" --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            # Get the latest image tag for this environment
+            # For dev environment, prefer dev-latest tag
+            ENV_TAG="${{ matrix.environment }}-latest"
+            
             LATEST_TAG=$(aws ecr describe-images \
-              --repository-name "${{ matrix.environment }}-${{ matrix.service }}" \
+              --repository-name "mbocak-microservices-demo/${SERVICE_REPO}" \
               --region ${{ env.AWS_REGION }} \
-              --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
-              --output text)
+              --query "imageDetails[?contains(imageTags, '${ENV_TAG}')].imageTags[0]" \
+              --output text 2>/dev/null || echo "")
+            
+            # Fallback to any latest tag if environment-specific not found
+            if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" == "None" ]; then
+              LATEST_TAG=$(aws ecr describe-images \
+                --repository-name "mbocak-microservices-demo/${SERVICE_REPO}" \
+                --region ${{ env.AWS_REGION }} \
+                --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
+                --output text)
+            fi
 
             if [ "$LATEST_TAG" != "None" ] && [ -n "$LATEST_TAG" ]; then
-              IMAGE_URI="${ECR_REPO}:${LATEST_TAG}"
+              IMAGE_URI="${ECR_REGISTRY_URI}/${SERVICE_REPO}:${LATEST_TAG}"
               echo "Found image: $IMAGE_URI"
               echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
               echo "image_exists=true" >> "$GITHUB_OUTPUT"
             else
-              echo "No tagged images found in repository ${{ matrix.environment }}-${{ matrix.service }}"
+              echo "No tagged images found in repository mbocak-microservices-demo/${SERVICE_REPO}"
               echo "image_exists=false" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "Repository ${{ matrix.environment }}-${{ matrix.service }} does not exist"
+            echo "Repository mbocak-microservices-demo/${SERVICE_REPO} does not exist"
             echo "image_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
