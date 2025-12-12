@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'terraform/environments/**'
-      - 'terraform/shared/**'
       - 'terraform/modules/**'
 
 env:

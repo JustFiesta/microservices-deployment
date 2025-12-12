@@ -1,12 +1,4 @@
 #
-# ECR
-#
-output "repo_url" {
-  description = "ECR repository URL"
-  value       = aws_ecr_repository.this.repository_url
-}
-
-#
 # VPC
 #
 output "vpc_id" {

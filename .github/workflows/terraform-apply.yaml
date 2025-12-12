@@ -6,7 +6,6 @@ on:
       - 'main'
     paths:
       - 'terraform/environments/**'
-      - 'terraform/shared/**'
       - 'terraform/modules/**'
 
 env:
