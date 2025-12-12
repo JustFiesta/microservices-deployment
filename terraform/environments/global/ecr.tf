@@ -53,11 +53,11 @@ resource "aws_ecr_lifecycle_policy" "microservices_retention" {
       },
       {
         rulePriority = 2
-        description  = "Keep last 10 production semver images (any version format)"
+        description  = "Keep last 10 production semver images (exclude dev-*)"
         selection = {
-          tagStatus   = "tagged"
-          countType   = "imageCountMoreThan"
-          countNumber = 10
+          tagStatus     = "any"
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
         }
         action = {
           type = "expire"
