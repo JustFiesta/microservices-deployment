@@ -1,20 +1,49 @@
-resource "aws_ecr_repository" "this" {
-  name = local.project_name
-  tags = local.tags
+# Automatically discover all microservices that have Dockerfiles
+locals {
+  # Path to microservices source directory (relative to terraform root)
+  microservices_path = "${path.root}/../../../microservices-demo/src"
+  
+  # Get all directories that contain Dockerfile
+  service_dirs = fileset(local.microservices_path, "*/Dockerfile")
+  
+  # Extract service names (remove /Dockerfile suffix)
+  services = toset([for dir in local.service_dirs : dirname(dir)])
 }
 
+# Create ECR repository for each discovered microservice
+resource "aws_ecr_repository" "microservices" {
+  for_each = local.services
+  
+  name = "${local.project_name}/${each.key}"
+  
+  image_scanning_configuration {
+    scan_on_push = true  # Auto-scan on push
+  }
+  
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+  
+  tags = merge(local.tags, {
+    service = each.key
+    managed = "terraform"
+  })
+}
 
-resource "aws_ecr_lifecycle_policy" "retency_policy" {
-  repository = aws_ecr_repository.this.name
+# Lifecycle policy for each microservice repository
+resource "aws_ecr_lifecycle_policy" "microservices_retention" {
+  for_each = aws_ecr_repository.microservices
+  
+  repository = each.value.name
 
   policy = jsonencode({
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 5 tagged images (multi-arch safe)"
+        description  = "Keep last 5 dev-* tagged images per service"
         selection = {
           tagStatus     = "tagged"
-          tagPrefixList = ["invoice-"]
+          tagPrefixList = ["dev-"]
           countType     = "imageCountMoreThan"
           countNumber   = 5
         }
@@ -24,6 +53,19 @@ resource "aws_ecr_lifecycle_policy" "retency_policy" {
       },
       {
         rulePriority = 2
+        description  = "Keep last 10 production images (semver format)"
+        selection = {
+          tagStatus      = "tagged"
+          tagPatternList = ["[0-9]*.[0-9]*.[0-9]*"]  # Matches 1.0.0, 1.2.3, etc.
+          countType      = "imageCountMoreThan"
+          countNumber    = 10
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 3
         description  = "Expire untagged images older than 1 day"
         selection = {
           tagStatus   = "untagged"
