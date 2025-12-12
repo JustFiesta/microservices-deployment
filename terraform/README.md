@@ -4,7 +4,7 @@ This directory contains Terraform configurations for deploying AWS EKS infrastru
 
 ## TODO
 
-- add info about global resources in environments/global
+- add info about global resources in environments/global (only one ECR per whole project is supported)
 - add info about changing only one env at a time due to workflow limitations (tf plan filename race condition)
 
 ## Directory Structure
