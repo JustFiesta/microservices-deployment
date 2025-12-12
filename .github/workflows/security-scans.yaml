@@ -21,7 +21,7 @@ jobs:
 
   discover-services:
     name: Discover Microservices
-    uses: ./.github/workflows/reusable_discover-app-services.yaml
+    uses: ./.github/workflows/reusable_discover-app-services-all.yaml
 
   scan-ecr-images:
     name: Scan ECR Images - ${{ matrix.environment }}/${{ matrix.service }}
