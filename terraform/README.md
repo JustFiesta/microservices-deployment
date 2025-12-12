@@ -2,6 +2,11 @@
 
 This directory contains Terraform configurations for deploying AWS EKS infrastructure across multiple environments, for `microservices-demo` application.
 
+## TODO
+
+- add info about global resources in environments/global
+- add info about changing only one env at a time due to workflow limitations (tf plan filename race condition)
+
 ## Directory Structure
 
 ```shell
@@ -86,7 +91,7 @@ No additional pipeline configuration needed.
 
 ### 7. Add ECR secret for created environment
 
-Pipelines for security and CI reqiure destigneted ECR variables per environment in given convention: `<ENV_NAME>_ECR_REGISTRY`, eg. `DEV_ECR_REGISTRY`.
+Pipelines for security and CI reqiure destigneted ECR variables per environment in given convention: `<ENV_NAME>_ECR_REGISTRY_URI`, eg. `DEV_ECR_REGISTRY_URI`.
 
 This enables them to check correcponsind environment repository - without them they will not work.
 

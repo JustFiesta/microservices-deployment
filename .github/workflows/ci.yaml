@@ -9,8 +9,8 @@ on:
 
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # automatically provided by GitHub Actions
-  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY_URI: ${{ vars.ECR_REGISTRY_URI }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
   discover_services:
@@ -108,5 +108,5 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.ref_name }}
-            ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:latest
+            ${{ env.ECR_REGISTRY_URI }}/${{ matrix.service }}:${{ github.ref_name }}
+            ${{ env.ECR_REGISTRY_URI }}/${{ matrix.service }}:latest
