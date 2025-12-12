@@ -53,11 +53,12 @@ resource "aws_ecr_lifecycle_policy" "microservices_retention" {
       },
       {
         rulePriority = 2
-        description  = "Keep last 10 production semver images (exclude dev-*)"
+        description  = "Expire untagged images older than 1 day"
         selection = {
-          tagStatus     = "any"
-          countType     = "imageCountMoreThan"
-          countNumber   = 10
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countNumber = 1
+          countUnit   = "days"
         }
         action = {
           type = "expire"
@@ -65,12 +66,11 @@ resource "aws_ecr_lifecycle_policy" "microservices_retention" {
       },
       {
         rulePriority = 3
-        description  = "Expire untagged images older than 1 day"
+        description  = "Keep last 10 images total (catch-all for remaining images)"
         selection = {
-          tagStatus   = "untagged"
-          countType   = "sinceImagePushed"
-          countNumber = 1
-          countUnit   = "days"
+          tagStatus = "any"
+          countType = "imageCountMoreThan"
+          countNumber = 10
         }
         action = {
           type = "expire"
