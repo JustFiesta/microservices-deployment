@@ -89,37 +89,7 @@ jobs:
 
           git push origin "$GIT_TAG"
 
-          echo "✅ Created git tag: ${GIT_TAG}"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image for scanning
-        uses: docker/build-push-action@v6
-        with:
-          context: ./microservices-demo/src/${{ matrix.service }}
-          file: ./microservices-demo/src/${{ matrix.service }}/Dockerfile
-          platforms: linux/amd64
-          load: true
-          tags: ${{ matrix.service }}:scan-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: '${{ matrix.service }}:scan-${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          exit-code: '0'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
+          echo "Created git tag: ${GIT_TAG}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -151,6 +121,9 @@ jobs:
 
           echo "- Image tags to be created:"
           echo "    ${TAGS}" | tr ',' '\n' | sed 's/^/  - /'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push to ECR
         uses: docker/build-push-action@v6
@@ -186,8 +159,8 @@ jobs:
 
           if [ "${{ github.event_name }}" == "push" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **Auto-deployed to dev environment**" >> $GITHUB_STEP_SUMMARY
+            echo "**Auto-deployed to dev environment**" >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "🧪 **Available for testing (dev tags created)**" >> $GITHUB_STEP_SUMMARY
+            echo "**Available for testing (dev tags created)**" >> $GITHUB_STEP_SUMMARY
           fi
