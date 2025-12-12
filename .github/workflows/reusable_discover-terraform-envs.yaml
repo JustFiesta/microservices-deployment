@@ -2,6 +2,12 @@ name: Discover Terraform Environments
 
 on:
   workflow_call:
+    inputs:
+      exclude:
+        description: "Comma-separated list of environment names to exclude (e.g., 'global,test')"
+        required: false
+        type: string
+        default: ''
     outputs:
       environments:
         description: "JSON array of discovered Terraform environment names"
@@ -22,7 +28,42 @@ jobs:
       - name: Discover Environments
         id: discover
         run: |
-          ENVIRONMENTS=$(find terraform/environments -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R . | jq -sc .)
+          # Discover all environments
+          ALL_ENVS=$(find terraform/environments -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+
+          # Convert exclude input to array
+          EXCLUDE_LIST="${{ inputs.exclude }}"
+
+          if [ -n "$EXCLUDE_LIST" ]; then
+            echo "Excluding environments: $EXCLUDE_LIST"
+
+            # Convert comma-separated list to array
+            IFS=',' read -ra EXCLUDE_ARRAY <<< "$EXCLUDE_LIST"
+
+            # Filter out excluded environments
+            FILTERED_ENVS=()
+            for env in $ALL_ENVS; do
+              exclude=false
+              for excluded in "${EXCLUDE_ARRAY[@]}"; do
+                # Trim whitespace
+                excluded=$(echo "$excluded" | xargs)
+                if [ "$env" = "$excluded" ]; then
+                  exclude=true
+                  break
+                fi
+              done
+              if [ "$exclude" = false ]; then
+                FILTERED_ENVS+=("$env")
+              fi
+            done
+
+            # Convert to JSON array
+            ENVIRONMENTS=$(printf '%s\n' "${FILTERED_ENVS[@]}" | jq -R . | jq -sc .)
+          else
+            # No exclusions - use all environments
+            ENVIRONMENTS=$(echo "$ALL_ENVS" | jq -R . | jq -sc .)
+          fi
+
           echo "====================================="
           echo "  Discovered environments: $ENVIRONMENTS"
           echo "====================================="
