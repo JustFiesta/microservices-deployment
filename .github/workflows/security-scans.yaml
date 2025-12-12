@@ -10,7 +10,7 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  ECR_REGISTRY_URI: ${{ secrets.ECR_REGISTRY_URI }}
+  ECR_REGISTRY_URI: ${{ vars.ECR_REGISTRY_URI }}
 
 jobs:
   discover-environments:
