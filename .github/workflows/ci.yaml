@@ -14,8 +14,8 @@ env:
 
 jobs:
   discover_services:
-    name: Discover Microservices
-    uses: ./.github/workflows/reusable_discover-app-services.yaml
+    name: Discover Changed Microservices
+    uses: ./.github/workflows/reusable_discover-app-services-changes.yaml
 
   build_and_push:
     needs: discover_services
