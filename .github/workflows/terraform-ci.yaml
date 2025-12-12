@@ -5,13 +5,6 @@ on:
     paths:
       - 'terraform/environments/**'
       - 'terraform/modules/**'
-#   push:
-#     branches: 
-#       - '*'
-#       - '!main'
-#     paths:
-#       - 'terraform/environments/**'
-#       - 'terraform/modules/**'
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
