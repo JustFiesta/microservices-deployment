@@ -10,7 +10,7 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # automatically provided by GitHub Actions
   ECR_REGISTRY_URI: ${{ secrets.ECR_REGISTRY_URI }}
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
   discover_services:
