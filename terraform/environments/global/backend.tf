@@ -6,4 +6,3 @@ terraform {
     encrypt        = true
   }
 }
-# reapply 1
