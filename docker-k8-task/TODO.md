@@ -17,8 +17,8 @@
     * Create pipeline for deploing K8 manifests/Kustomize/Helm files
 4. Create infrastructure on Cloud:
     * TF S3 [DONE]
-    * K8 cluster
-    * IAM
+    * K8 cluster [DONE]
+    * IAM [DONE]
 5. Enable K8 cluster to pull images from repository
 6. Install K8 addons: HPA controller, Metrics server
 7. Create manifests for application with Kustomize

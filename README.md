@@ -41,7 +41,7 @@ TODO
     * AWS_REGION
     * AWS_ACCESS_KEY_ID
     * AWS_SECRET_ACCESS_KEY
-    * ECR_REGISTRY
+    * ECR_REGISTRY_URI
     * TERRAFORM_VERSION
 
 4. Create TF environment (eg. terraform/env/dev/main.tf)
