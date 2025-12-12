@@ -111,7 +111,6 @@ jobs:
 
           # Base tags (always created)
           TAGS="${REGISTRY}/${SERVICE}:${VERSION_SHA}"
-          TAGS="${TAGS},${REGISTRY}/${SERVICE}:${VERSION}"
 
           # Dev tags (for PR and main branch)
           TAGS="${TAGS},${REGISTRY}/${SERVICE}:dev-${VERSION}"
