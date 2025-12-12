@@ -34,17 +34,25 @@ The deployment is fully Automated with CI/CD for code and also for Terraform fil
 
 TODO
 
+!!! only one ECR is supported per whole project. (terraform/global/)
+!!! resources are created only in one account
+
 1. Create S3 on AWS
 2. Add S3 name into provider
-3. Set reqiured ENVs in repository secrets:
+3. Set reqiured ENVs in repository secrets/variables:
 
-    * AWS_REGION
+Secrets:
+
     * AWS_ACCESS_KEY_ID
     * AWS_SECRET_ACCESS_KEY
+
+Variables:
+
+    * AWS_REGION
     * ECR_REGISTRY_URI
     * TERRAFORM_VERSION
 
-4. Create TF environment (eg. terraform/env/dev/main.tf)
+4. Create TF environment (eg. terraform/env/dev/main.tf, global/)
 5. Setup ArgoCD in Kubernetes Cluster
 6. Reapply code - make some sample change in microserives-demo/src/
 7. Reapply Kubernetes manifests - change their version to correct ones from ECR
