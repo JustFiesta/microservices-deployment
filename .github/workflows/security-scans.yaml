@@ -16,6 +16,8 @@ jobs:
   discover-environments:
     name: Discover Terraform Environments
     uses: ./.github/workflows/reusable_discover-terraform-envs.yaml
+    with:
+      exclude: 'global'
 
   discover-services:
     name: Discover Microservices
