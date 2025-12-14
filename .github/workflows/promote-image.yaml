@@ -1,0 +1,130 @@
+name: Promote Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service name (e.g., frontend)'
+        required: true
+      source_tag:
+        description: 'Source tag (e.g., 1.0.5-abc1234)'
+        required: true
+      target_env:
+        description: 'Target environment (e.g., qa, test, hotfix-202406)'
+        required: true
+
+env:
+  ECR_REGISTRY_URI: ${{ vars.ECR_REGISTRY_URI }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  CRANE_VERSION: v3.6.1
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate inputs
+        run: |
+          echo "Service: ${{ inputs.service }}"
+          echo "Source: ${{ inputs.source_tag }}"
+          echo "Target env: ${{ inputs.target_env }}"
+
+          if ! [[ "${{ inputs.service }}" =~ ^[a-zA-Z0-9_]+$ ]]; then
+            echo "❌ Invalid service name"
+            exit 1
+          fi
+
+          if ! [[ "${{ inputs.target_env }}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "❌ Invalid environment name"
+            exit 1
+          fi
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Install crane
+        run: |
+          bash -c "`curl -sL https://raw.githubusercontent.com/michaelsauter/crane/${{ env.CRANE_VERSION }}/download.sh`" && \
+          sudo mv crane /usr/local/bin/
+          crane version
+
+      - name: Check source image
+        run: |
+          SOURCE="${{ env.ECR_REGISTRY_URI }}/${{ inputs.service }}:${{ inputs.source_tag }}"
+          echo "Checking: ${SOURCE}"
+
+          if ! crane manifest "${SOURCE}" > /dev/null 2>&1; then
+            echo "❌ Image not found"
+            exit 1
+          fi
+
+          echo "✅ Image exists"
+          echo "SOURCE_IMAGE=${SOURCE}" >> $GITHUB_ENV
+
+      - name: Extract version
+        run: |
+          TAG="${{ inputs.source_tag }}"
+
+          # Try to extract X.Y.Z from anywhere in tag
+          if [[ "$TAG" =~ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+          else
+            VERSION="$TAG"
+          fi
+
+          echo "Version: ${VERSION}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Build promotion tags
+        run: |
+          ENV="${{ inputs.target_env }}"
+          VERSION="${{ env.VERSION }}"
+
+          TAG1="${ENV}-${VERSION}"
+          TAG2="${ENV}-latest"
+
+          echo "New tags:"
+          echo "  ${TAG1}"
+          echo "  ${TAG2}"
+
+          echo "TAG1=${TAG1}" >> $GITHUB_ENV
+          echo "TAG2=${TAG2}" >> $GITHUB_ENV
+
+      - name: Promote image
+        run: |
+          SOURCE="${{ env.SOURCE_IMAGE }}"
+
+          echo "Promoting..."
+          crane tag "${SOURCE}" "${{ env.TAG1 }}"
+          crane tag "${SOURCE}" "${{ env.TAG2 }}"
+
+          echo "✅ Promotion complete"
+
+      - name: Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ✅ Promotion Complete
+
+          **Service:** ${{ inputs.service }}
+          **Source:** ${{ inputs.source_tag }}
+          **Environment:** ${{ inputs.target_env }}
+
+          ### New tags:
+          - \`${{ env.TAG1 }}\`
+          - \`${{ env.TAG2 }}\`
+
+          **Full images:**
+          \`\`\`
+          ${{ env.ECR_REGISTRY_URI }}/${{ inputs.service }}:${{ env.TAG1 }}
+          ${{ env.ECR_REGISTRY_URI }}/${{ inputs.service }}:${{ env.TAG2 }}
+          \`\`\`
+          EOF
