@@ -90,7 +90,7 @@ jobs:
           VERSION="${{ env.VERSION }}"
 
           TAG1="${ENV}-${VERSION}"
-          TAG2="${ENV}-latest"
+          TAG2="${ENV}"
 
           echo "New tags:"
           echo "  ${TAG1}"
