@@ -115,12 +115,14 @@ terraform {
 #### 3. Set GitHub Secrets/Variables
 
 **Repository Secrets** (Settings → Secrets and variables → Actions):
+
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 
 **Repository Variables**:
+
 - `AWS_REGION` (e.g., `eu-west-1`)
-- `ECR_REGISTRY_URI` (e.g., `123456789012.dkr.ecr.eu-west-1.amazonaws.com`)
+- `ECR_REGISTRY_URI` (e.g., `123456789012.dkr.ecr.eu-west-1.amazonaws.com/ecr-name`)
 - `TERRAFORM_VERSION` (e.g., `1.9.0`)
 
 #### 4. Update Local Variables
@@ -175,6 +177,7 @@ To create new environments (qa, prod), copy `dev/` and adjust configuration (see
 **Problem**: Promotion reports "Image not found"
 
 **Solution**:
+
 - Verify tag exists: `aws ecr list-images --repository-name <project>/<service>`
 
 ### EKS Cluster Creation Timeout
@@ -182,6 +185,7 @@ To create new environments (qa, prod), copy `dev/` and adjust configuration (see
 **Problem**: `terraform apply` timeout after 40 minutes
 
 **Solution**:
+
 - Check CloudFormation console (EKS uses CFN under the hood)
 - Verify IAM permissions and permission boundaries
 - Ensure VPC has correct DNS settings
