@@ -114,7 +114,7 @@ jobs:
 
           # Dev tags (for PR and main branch)
           TAGS="${TAGS},${REGISTRY}/${SERVICE}:dev-${VERSION}"
-          TAGS="${TAGS},${REGISTRY}/${SERVICE}:dev-latest"
+          TAGS="${TAGS},${REGISTRY}/${SERVICE}:dev"
 
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
