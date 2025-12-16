@@ -1,3 +1,6 @@
+#
+# NGINX Ingress Controller
+#
 resource "kubernetes_namespace" "ingress_nginx" {
   metadata {
     name = "ingress-nginx"
@@ -26,3 +29,10 @@ resource "helm_release" "nginx_ingress" {
   })]
 }
 
+#
+# Metrics Server
+#
+
+#
+# Argo CD
+#
