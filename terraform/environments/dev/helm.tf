@@ -32,7 +32,48 @@ resource "helm_release" "nginx_ingress" {
 #
 # Metrics Server
 #
+resource "helm_release" "metrics_server" {
+  name       = "metrics-server"
+  namespace  = "kube-system"
+  repository = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart      = "metrics-server"
+  version    = "3.12.1"
+
+  values = [yamlencode({
+    args = [
+      "--kubelet-insecure-tls",
+      "--kubelet-preferred-address-types=InternalIP"
+    ]
+  })]
+}
 
 #
 # Argo CD
 #
+resource "kubernetes_namespace" "argocd" {
+  metadata {
+    name = "argocd"
+  }
+}
+
+resource "helm_release" "argocd" {
+  name       = "argocd"
+  namespace  = kubernetes_namespace.argocd.metadata[0].name
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  version    = "7.7.12"
+
+  values = [yamlencode({
+    server = {
+      service = {
+        type = "LoadBalancer"
+      }
+    }
+
+    configs = {
+      params = {
+        "server.insecure" = true
+      }
+    }
+  })]
+}
