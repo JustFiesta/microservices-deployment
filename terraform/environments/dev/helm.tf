@@ -67,6 +67,9 @@ resource "helm_release" "argocd" {
     server = {
       service = {
         type = "LoadBalancer"
+        annotations = {
+          "service.beta.kubernetes.io/aws-load-balancer-scheme" = "internet-facing"
+        }
       }
     }
 
