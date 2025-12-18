@@ -6,15 +6,19 @@ ARG TARGETARCH=x64
 WORKDIR /app
 COPY package*.json ./
 
-RUN npm ci --only=production
+RUN npm install --only=production
 
 COPY server.js ./
 COPY proto ./proto
+COPY data ./data
 
 FROM gcr.io/distroless/nodejs14-debian11 AS runtime
 
 WORKDIR /app
-COPY --chown=1000:1000 . .
+COPY --chown=1000:1000 --from=build /app/node_modules ./node_modules
+COPY --chown=1000:1000 --from=build /app/server.js ./server.js
+COPY --chown=1000:1000 --from=build /app/proto ./proto
+COPY --chown=1000:1000 --from=build /app/data ./data
 
 EXPOSE 7000
 USER 1000:1000
