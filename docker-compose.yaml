@@ -148,6 +148,7 @@ services:
       - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
       - PROJECT_ID=local-dev
       - REGION=us-central1
+      - ALLOYDB_DATABASE_NAME=local-db
       - ENABLE_PROFILER=0
       - ENABLE_TRACING=0
     depends_on:
