@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM gradle:ubi-minimal AS build
+FROM --platform=$BUILDPLATFORM gradle:8.5-jdk21 AS build
 
 ARG TARGETOS=linux
 ARG TARGETARCH=x64
