@@ -1,6 +1,6 @@
 # TODO
 
-- Manifesty k8s dla apki oraz ArgoCD (+ Kustomize)
+- Manifesty k8s dla apki oraz ArgoCD
 - Pipeline dla K8s manifestów - promowanie powinno zmieniać pliki, 
 - Test deploy
 - Poprawki dokumentacji - opis replikacji (od forka do pełnego działania)
