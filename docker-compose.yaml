@@ -1,0 +1,236 @@
+version: '3.8'
+
+services:
+  # Redis for cart service
+  redis-cart:
+    image: redis:alpine
+    container_name: redis-cart
+    ports:
+      - "6379:6379"
+    networks:
+      - microservices-network
+
+  # Ad Service
+  adservice:
+    build:
+      context: ./microservices-demo/src/adservice
+      dockerfile: Dockerfile
+    container_name: adservice
+    ports:
+      - "9555:9555"
+    environment:
+      - PORT=9555
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    networks:
+      - microservices-network
+
+  # Cart Service
+  cartservice:
+    build:
+      context: ./microservices-demo/src/cartservice
+      dockerfile: Dockerfile
+    container_name: cartservice
+    ports:
+      - "7070:7070"
+    environment:
+      - REDIS_ADDR=redis-cart:6379
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    depends_on:
+      - redis-cart
+    networks:
+      - microservices-network
+
+  # Product Catalog Service
+  productcatalogservice:
+    build:
+      context: ./microservices-demo/src/productcatalogservice
+      dockerfile: Dockerfile
+    container_name: productcatalogservice
+    ports:
+      - "3550:3550"
+    environment:
+      - PORT=3550
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    networks:
+      - microservices-network
+
+  # Currency Service
+  currencyservice:
+    build:
+      context: ./microservices-demo/src/currencyservice
+      dockerfile: Dockerfile
+    container_name: currencyservice
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    networks:
+      - microservices-network
+
+  # Payment Service
+  paymentservice:
+    build:
+      context: ./microservices-demo/src/paymentservice
+      dockerfile: Dockerfile
+    container_name: paymentservice
+    ports:
+      - "50051:50051"
+    environment:
+      - PORT=50051
+      - DISABLE_PROFILER=1
+      - DISABLE_TRACING=1
+    networks:
+      - microservices-network
+
+  # Shipping Service
+  shippingservice:
+    build:
+      context: ./microservices-demo/src/shippingservice
+      dockerfile: Dockerfile
+    container_name: shippingservice
+    ports:
+      - "50052:50051"
+    environment:
+      - PORT=50051
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    networks:
+      - microservices-network
+
+  # Email Service
+  emailservice:
+    build:
+      context: ./microservices-demo/src/emailservice
+      dockerfile: Dockerfile
+    container_name: emailservice
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    networks:
+      - microservices-network
+
+  # Recommendation Service
+  recommendationservice:
+    build:
+      context: ./microservices-demo/src/recommendationservice
+      dockerfile: Dockerfile
+    container_name: recommendationservice
+    ports:
+      - "8082:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    depends_on:
+      - productcatalogservice
+    networks:
+      - microservices-network
+
+  # Shopping Assistant Service
+  shoppingassistantservice:
+    build:
+      context: ./microservices-demo/src/shoppingassistantservice
+      dockerfile: Dockerfile
+    container_name: shoppingassistantservice
+    ports:
+      - "8083:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - PROJECT_ID=local-dev
+      - REGION=us-central1
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    depends_on:
+      - productcatalogservice
+    networks:
+      - microservices-network
+
+  # Checkout Service
+  checkoutservice:
+    build:
+      context: ./microservices-demo/src/checkoutservice
+      dockerfile: Dockerfile
+    container_name: checkoutservice
+    ports:
+      - "5050:5050"
+    environment:
+      - PORT=5050
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - PAYMENT_SERVICE_ADDR=paymentservice:50051
+      - EMAIL_SERVICE_ADDR=emailservice:8080
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    depends_on:
+      - productcatalogservice
+      - cartservice
+      - currencyservice
+      - shippingservice
+      - emailservice
+      - paymentservice
+    networks:
+      - microservices-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./microservices-demo/src/frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8080
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - AD_SERVICE_ADDR=adservice:9555
+      - SHOPPING_ASSISTANT_SERVICE_ADDR=shoppingassistantservice:8080
+      - ENABLE_PROFILER=0
+      - ENABLE_TRACING=0
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+      - recommendationservice
+      - checkoutservice
+      - shippingservice
+      - adservice
+      - shoppingassistantservice
+    networks:
+      - microservices-network
+
+  # Load Generator
+  loadgenerator:
+    build:
+      context: ./microservices-demo/src/loadgenerator
+      dockerfile: Dockerfile
+    container_name: loadgenerator
+    environment:
+      - FRONTEND_ADDR=frontend:8080
+      - USERS=10
+      - RATE=1
+    command: ["-f", "locustfile.py", "--host", "http://frontend:8080", "--headless", "-u", "10", "-r", "1"]
+    depends_on:
+      - frontend
+    networks:
+      - microservices-network
+
+networks:
+  microservices-network:
+    driver: bridge
