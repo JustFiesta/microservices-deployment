@@ -1,0 +1,161 @@
+name: Helm Chart CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'helm/**'
+
+env:
+  HELM_VERSION: '3.14.0'
+  KUBEVAL_VERSION: '0.16.1'
+
+jobs:
+  discover-values-files:
+    name: Discover Values Files
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find all values files
+        id: set-matrix
+        run: |
+          FILES=$(find helm -maxdepth 1 -name 'values*.yaml' -type f | sort)
+          echo "Found values files:"
+          echo "$FILES"
+          MATRIX=$(echo "$FILES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  validate-helm:
+    name: Validate Helm Chart
+    needs: discover-values-files
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        values-file: ${{ fromJson(needs.discover-values-files.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install Kubeval
+        run: |
+          wget https://github.com/instrumenta/kubeval/releases/download/v${{ env.KUBEVAL_VERSION }}/kubeval-linux-amd64.tar.gz
+          tar xf kubeval-linux-amd64.tar.gz
+          sudo mv kubeval /usr/local/bin/
+          kubeval --version
+
+      - name: Helm Lint
+        run: |
+          echo "Running helm lint with ${{ matrix.values-file }}"
+          helm lint ./helm -f ./${{ matrix.values-file }}
+
+      - name: Helm Template
+        run: |
+          echo "Rendering templates with ${{ matrix.values-file }}"
+          FILENAME=$(basename ${{ matrix.values-file }} .yaml)
+          helm template microservices-demo ./helm \
+            -f ./${{ matrix.values-file }} \
+            --output-dir /tmp/rendered-${FILENAME}
+
+          echo "Generated manifests:"
+          find /tmp/rendered-${FILENAME} -type f -name '*.yaml' | wc -l
+
+      - name: Kubeval
+        run: |
+          echo "Validating rendered manifests with kubeval"
+          FILENAME=$(basename ${{ matrix.values-file }} .yaml)
+          kubeval --strict \
+            --ignore-missing-schemas \
+            /tmp/rendered-${FILENAME}/microservices-demo/templates/*.yaml
+
+  check-version-bump:
+    name: Check Chart Version Bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Check if templates changed
+        id: templates-changed
+        run: |
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          if echo "$CHANGED_FILES" | grep -q '^helm/templates/'; then
+            echo "templates_changed=true" >> $GITHUB_OUTPUT
+            echo "✅ Templates changed detected"
+          else
+            echo "templates_changed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No template changes detected"
+          fi
+
+      - name: Compare Chart versions
+        id: version-check
+        if: steps.templates-changed.outputs.templates_changed == 'true'
+        run: |
+          PR_VERSION=$(yq '.version' helm/Chart.yaml)
+          MAIN_VERSION=$(git show origin/main:helm/Chart.yaml | yq '.version')
+
+          echo "Main branch version: $MAIN_VERSION"
+          echo "PR branch version: $PR_VERSION"
+
+          if [ "$PR_VERSION" == "$MAIN_VERSION" ]; then
+            echo "version_bumped=false" >> $GITHUB_OUTPUT
+            echo "current_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "version_bumped=true" >> $GITHUB_OUTPUT
+            echo "✅ Chart version bumped: $MAIN_VERSION → $PR_VERSION"
+          fi
+
+      - name: Auto-bump Chart version
+        if: steps.templates-changed.outputs.templates_changed == 'true' && steps.version-check.outputs.version_bumped == 'false'
+        run: |
+          CURRENT_VERSION=$(yq '.version' helm/Chart.yaml)
+          echo "Current version: $CURRENT_VERSION"
+
+          # Parse semantic version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+
+          echo "Bumping version to: $NEW_VERSION"
+          yq -i ".version = \"$NEW_VERSION\"" helm/Chart.yaml
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add helm/Chart.yaml
+          git commit -m "chore(helm): bump chart version to $NEW_VERSION"
+          git push
+
+  summary:
+    name: Validation Summary
+    needs: [validate-helm, check-version-bump]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          if [ "${{ needs.validate-helm.result }}" != "success" ]; then
+            echo "❌ Helm validation failed"
+            exit 1
+          fi
+
+          echo "✅ All Helm validations passed"
