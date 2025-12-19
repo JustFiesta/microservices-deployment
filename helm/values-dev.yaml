@@ -1,0 +1,52 @@
+# Dev specific overrides for deployment
+
+global:
+  image:
+    tag: "dev"
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    host: "" # catch all, override in environment specific values files
+    annotations: {}
+      # Example AWS Load Balancer annotations (uncomment if needed):
+      # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      # service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+      # Example NGINX Ingress annotations:
+      # nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      # nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+      # nginx.ingress.kubernetes.io/rewrite-target: /
+
+loadgenerator:
+  enabled: true
+
+adservice:
+  replicaCount: 1
+
+cartservice:
+  replicaCount: 1
+
+checkoutservice:
+  replicaCount: 1
+
+currencyservice:
+  replicaCount: 1
+
+emailservice:
+  replicaCount: 1
+
+frontend:
+  replicaCount: 1
+
+paymentservice:
+  replicaCount: 1
+
+productcatalogservice:
+  replicaCount: 1
+
+recommendationservice:
+  replicaCount: 1
+
+shippingservice:
+  replicaCount: 1
