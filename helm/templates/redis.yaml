@@ -1,0 +1,96 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cart
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "redis-cart" "component" "database" "context" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.redis.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "redis-cart") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "microservices-demo.service.labels" (dict "serviceName" "redis-cart" "component" "database" "context" .) | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: redis
+        image: {{ include "microservices-demo.redis.image" . }}
+        imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+        ports:
+        - name: redis
+          containerPort: {{ .Values.redis.port }}
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.redis.resources | nindent 10 }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.redis.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.redis.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        {{- if .Values.redis.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: redis-cart-pvc
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cart
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "redis-cart" "component" "database" "context" .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "redis-cart") | nindent 4 }}
+  ports:
+  - name: redis
+    port: {{ .Values.redis.port }}
+    targetPort: {{ .Values.redis.port }}
+    protocol: TCP
+{{- if .Values.redis.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-cart-pvc
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "redis-cart" "component" "database" "context" .) | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+{{- end }}
+{{- end }}
