@@ -1,5 +1,13 @@
 TODO
 
+- co to terraform
+- jak jest zorganizowane wszystko
+- jaki flow wspiera
+- dlaczego global jest zawsze ważne
+- jak ECR jest ogarniany (jeden dla wszystkich envow)
+- jak używać/dodawać envy, edytować itp
+- graf deva
+
 # Terraform Infrastructure
 
 Documentation for AWS infrastructure managed by Terraform.
