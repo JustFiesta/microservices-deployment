@@ -1,0 +1,53 @@
+{{- if .Values.loadgenerator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgenerator
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "loadgenerator" "component" "loadgenerator" "context" .) | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "loadgenerator") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "microservices-demo.service.labels" (dict "serviceName" "loadgenerator" "component" "loadgenerator" "context" .) | nindent 8 }}
+    spec:
+      serviceAccountName: loadgenerator
+      terminationGracePeriodSeconds: 5
+      restartPolicy: Always
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: main
+        image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.loadgenerator) }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        env:
+        - name: FRONTEND_ADDR
+          value: "frontend:{{ .Values.frontend.port }}"
+        - name: USERS
+          value: "10"
+        - name: RATE
+          value: "1"
+        resources:
+          {{- toYaml .Values.loadgenerator.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: loadgenerator
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "loadgenerator" "component" "loadgenerator" "context" .) | nindent 4 }}
+{{- end }}

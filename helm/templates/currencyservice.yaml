@@ -1,0 +1,84 @@
+{{- if .Values.currencyservice.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currencyservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "currencyservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.currencyservice.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "currencyservice") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "microservices-demo.service.labels" (dict "serviceName" "currencyservice" "component" "backend" "context" .) | nindent 8 }}
+    spec:
+      serviceAccountName: currencyservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.currencyservice) }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        ports:
+        - name: grpc
+          containerPort: {{ .Values.currencyservice.port }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: {{ .Values.currencyservice.port | quote }}
+        - name: DISABLE_PROFILER
+          value: "1"
+        resources:
+          {{- toYaml .Values.currencyservice.resources | nindent 10 }}
+        readinessProbe:
+          grpc:
+            port: {{ .Values.currencyservice.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          grpc:
+            port: {{ .Values.currencyservice.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: currencyservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "currencyservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "currencyservice") | nindent 4 }}
+  ports:
+  - name: grpc
+    port: {{ .Values.currencyservice.port }}
+    targetPort: {{ .Values.currencyservice.port }}
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: currencyservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "currencyservice" "component" "backend" "context" .) | nindent 4 }}
+{{- end }}

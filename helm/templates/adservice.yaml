@@ -1,0 +1,86 @@
+{{- if .Values.adservice.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "adservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.adservice.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "adservice") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "microservices-demo.service.labels" (dict "serviceName" "adservice" "component" "backend" "context" .) | nindent 8 }}
+    spec:
+      serviceAccountName: adservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.adservice) }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        ports:
+        - name: grpc
+          containerPort: {{ .Values.adservice.port }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: {{ .Values.adservice.port | quote }}
+        - name: DISABLE_STATS
+          value: "1"
+        - name: DISABLE_TRACING
+          value: "1"
+        resources:
+          {{- toYaml .Values.adservice.resources | nindent 10 }}
+        readinessProbe:
+          grpc:
+            port: {{ .Values.adservice.port }}
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          grpc:
+            port: {{ .Values.adservice.port }}
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "adservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "adservice") | nindent 4 }}
+  ports:
+  - name: grpc
+    port: {{ .Values.adservice.port }}
+    targetPort: {{ .Values.adservice.port }}
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: adservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "adservice" "component" "backend" "context" .) | nindent 4 }}
+{{- end }}

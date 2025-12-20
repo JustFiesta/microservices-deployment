@@ -1,0 +1,94 @@
+{{- if .Values.checkoutservice.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkoutservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "checkoutservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.checkoutservice.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "checkoutservice") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "microservices-demo.service.labels" (dict "serviceName" "checkoutservice" "component" "backend" "context" .) | nindent 8 }}
+    spec:
+      serviceAccountName: checkoutservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.checkoutservice) }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        ports:
+        - name: grpc
+          containerPort: {{ .Values.checkoutservice.port }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: {{ .Values.checkoutservice.port | quote }}
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:{{ .Values.productcatalogservice.port }}"
+        - name: SHIPPING_SERVICE_ADDR
+          value: "shippingservice:{{ .Values.shippingservice.port }}"
+        - name: PAYMENT_SERVICE_ADDR
+          value: "paymentservice:{{ .Values.paymentservice.port }}"
+        - name: EMAIL_SERVICE_ADDR
+          value: "emailservice:{{ .Values.emailservice.port }}"
+        - name: CURRENCY_SERVICE_ADDR
+          value: "currencyservice:{{ .Values.currencyservice.port }}"
+        - name: CART_SERVICE_ADDR
+          value: "cartservice:{{ .Values.cartservice.port }}"
+        resources:
+          {{- toYaml .Values.checkoutservice.resources | nindent 10 }}
+        readinessProbe:
+          grpc:
+            port: {{ .Values.checkoutservice.port }}
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          grpc:
+            port: {{ .Values.checkoutservice.port }}
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkoutservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "checkoutservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "checkoutservice") | nindent 4 }}
+  ports:
+  - name: grpc
+    port: {{ .Values.checkoutservice.port }}
+    targetPort: {{ .Values.checkoutservice.port }}
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: checkoutservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "checkoutservice" "component" "backend" "context" .) | nindent 4 }}
+{{- end }}
