@@ -56,7 +56,13 @@ Service-specific labels
 app: {{ .serviceName }}
 app.kubernetes.io/name: {{ .serviceName }}
 app.kubernetes.io/component: {{ .component | default "backend" }}
-{{ include "microservices-demo.labels" .context }}
+app.kubernetes.io/instance: {{ .context.Release.Name }}
+app.kubernetes.io/managed-by: {{ .context.Release.Service }}
+app.kubernetes.io/part-of: microservices-demo
+helm.sh/chart: {{ include "microservices-demo.chart" .context }}
+{{- if .context.Chart.AppVersion }}
+app.kubernetes.io/version: {{ .context.Chart.AppVersion | quote }}
+{{- end }}
 {{- end }}
 
 {{/*
