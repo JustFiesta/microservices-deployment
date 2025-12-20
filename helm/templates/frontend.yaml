@@ -47,6 +47,8 @@ spec:
           value: "shippingservice:{{ .Values.shippingservice.port }}"
         - name: AD_SERVICE_ADDR
           value: "adservice:{{ .Values.adservice.port }}"
+        - name: SHOPPING_ASSISTANT_SERVICE_ADDR
+          value: "shoppingassistantservice:{{ .Values.shoppingassistantservice.port }}"
         - name: ENABLE_PROFILER
           value: "0"
         resources:

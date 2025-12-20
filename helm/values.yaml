@@ -177,6 +177,20 @@ shippingservice:
       cpu: 200m
       memory: 128Mi
 
+shoppingassistantservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    name: shoppingassistantservice
+  port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
 redis:
   enabled: true
   replicaCount: 1
