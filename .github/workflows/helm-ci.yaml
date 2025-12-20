@@ -9,7 +9,7 @@ on:
 
 env:
   HELM_VERSION: '3.14.0'
-  KUBEVAL_VERSION: '0.16.1'
+  KUBECONFORM_VERSION: '0.6.4'
 
 jobs:
   discover-values-files:
@@ -45,12 +45,12 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
-      - name: Install Kubeval
+      - name: Install Kubeconform
         run: |
-          wget https://github.com/instrumenta/kubeval/releases/download/v${{ env.KUBEVAL_VERSION }}/kubeval-linux-amd64.tar.gz
-          tar xf kubeval-linux-amd64.tar.gz
-          sudo mv kubeval /usr/local/bin/
-          kubeval --version
+          wget https://github.com/yannh/kubeconform/releases/download/v${{ env.KUBECONFORM_VERSION }}/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+          kubeconform -v
 
       - name: Helm Lint
         run: |
@@ -68,12 +68,14 @@ jobs:
           echo "Generated manifests:"
           find /tmp/rendered-${FILENAME} -type f -name '*.yaml' | wc -l
 
-      - name: Kubeval
+      - name: Kubeconform Validation
         run: |
-          echo "Validating rendered manifests with kubeval"
+          echo "Validating rendered manifests with kubeconform"
           FILENAME=$(basename ${{ matrix.values-file }} .yaml)
-          kubeval --strict \
-            --ignore-missing-schemas \
+          kubeconform -strict -summary \
+            -kubernetes-version 1.28.0 \
+            -schema-location default \
+            -verbose \
             /tmp/rendered-${FILENAME}/microservices-demo/templates/*.yaml
 
   check-version-bump:
@@ -111,17 +113,27 @@ jobs:
         if: steps.templates-changed.outputs.templates_changed == 'true'
         run: |
           PR_VERSION=$(yq '.version' helm/Chart.yaml)
-          MAIN_VERSION=$(git show origin/main:helm/Chart.yaml | yq '.version')
 
-          echo "Main branch version: $MAIN_VERSION"
-          echo "PR branch version: $PR_VERSION"
+          # Check if helm/Chart.yaml exists in main branch
+          if git cat-file -e origin/main:helm/Chart.yaml 2>/dev/null; then
+            MAIN_VERSION=$(git show origin/main:helm/Chart.yaml | yq '.version')
+            echo "Main branch version: $MAIN_VERSION"
+            echo "PR branch version: $PR_VERSION"
 
-          if [ "$PR_VERSION" == "$MAIN_VERSION" ]; then
-            echo "version_bumped=false" >> $GITHUB_OUTPUT
-            echo "current_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
+            if [ "$PR_VERSION" == "$MAIN_VERSION" ]; then
+              echo "version_bumped=false" >> $GITHUB_OUTPUT
+              echo "current_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
+              echo "⚠️ Chart version needs to be bumped: $MAIN_VERSION"
+            else
+              echo "version_bumped=true" >> $GITHUB_OUTPUT
+              echo "✅ Chart version bumped: $MAIN_VERSION → $PR_VERSION"
+            fi
           else
+            # helm/Chart.yaml doesn't exist in main - this is a new chart
+            echo "Main branch version: null"
+            echo "PR branch version: $PR_VERSION"
             echo "version_bumped=true" >> $GITHUB_OUTPUT
-            echo "✅ Chart version bumped: $MAIN_VERSION → $PR_VERSION"
+            echo "✅ Chart version bumped: null → $PR_VERSION"
           fi
 
       - name: Auto-bump Chart version
@@ -144,18 +156,3 @@ jobs:
           git add helm/Chart.yaml
           git commit -m "chore(helm): bump chart version to $NEW_VERSION"
           git push
-
-  summary:
-    name: Validation Summary
-    needs: [validate-helm, check-version-bump]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Check job results
-        run: |
-          if [ "${{ needs.validate-helm.result }}" != "success" ]; then
-            echo "❌ Helm validation failed"
-            exit 1
-          fi
-
-          echo "✅ All Helm validations passed"
