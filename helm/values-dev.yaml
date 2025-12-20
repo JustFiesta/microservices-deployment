@@ -83,3 +83,10 @@ shippingservice:
   replicaCount: 1
   image:
     tag: "dev-1.0.0"
+
+
+shoppingassistantservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"

@@ -1,0 +1,86 @@
+{{- if .Values.shoppingassistantservice.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shoppingassistantservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "shoppingassistantservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.shoppingassistantservice.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "shoppingassistantservice") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "microservices-demo.service.labels" (dict "serviceName" "shoppingassistantservice" "component" "backend" "context" .) | nindent 8 }}
+    spec:
+      serviceAccountName: shoppingassistantservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.shoppingassistantservice) }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        ports:
+        - name: grpc
+          containerPort: {{ .Values.shoppingassistantservice.port }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: {{ .Values.shoppingassistantservice.port | quote }}
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:{{ .Values.productcatalogservice.port }}"
+        - name: DISABLE_PROFILER
+          value: "1"
+        resources:
+          {{- toYaml .Values.shoppingassistantservice.resources | nindent 10 }}
+        readinessProbe:
+          grpc:
+            port: {{ .Values.shoppingassistantservice.port }}
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          grpc:
+            port: {{ .Values.shoppingassistantservice.port }}
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shoppingassistantservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "shoppingassistantservice" "component" "backend" "context" .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "shoppingassistantservice") | nindent 4 }}
+  ports:
+  - name: grpc
+    port: {{ .Values.shoppingassistantservice.port }}
+    targetPort: {{ .Values.shoppingassistantservice.port }}
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: shoppingassistantservice
+  labels:
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "shoppingassistantservice" "component" "backend" "context" .) | nindent 4 }}
+{{- end }}
