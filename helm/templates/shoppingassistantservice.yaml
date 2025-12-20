@@ -41,6 +41,14 @@ spec:
           value: {{ .Values.shoppingassistantservice.region | default "eu-west-1" | quote }}
         - name: ALLOYDB_DATABASE_NAME
           value: {{ .Values.shoppingassistantservice.databaseName | default "shopping-assistant-db" | quote }}
+        - name: ALLOYDB_TABLE_NAME
+          value: {{ .Values.shoppingassistantservice.tableName | default "recommendations" | quote }}
+        - name: ALLOYDB_CLUSTER_NAME
+          value: {{ .Values.shoppingassistantservice.clusterName | default "shopping-cluster" | quote }}
+        - name: ALLOYDB_INSTANCE_NAME
+          value: {{ .Values.shoppingassistantservice.instanceName | default "shopping-instance" | quote }}
+        - name: ALLOYDB_SECRET_NAME
+          value: {{ .Values.shoppingassistantservice.secretName | default "alloydb-secret" | quote }}
         - name: DISABLE_PROFILER
           value: "1"
         resources:
