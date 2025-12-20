@@ -82,6 +82,9 @@ jobs:
   check-version-bump:
     name: Check Chart Version Bump
     runs-on: ubuntu-latest
+
+    needs: [discover-values-files, validate-helm]
+
     steps:
       - uses: actions/checkout@v4
         with:
