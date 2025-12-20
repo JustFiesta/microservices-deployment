@@ -4,7 +4,7 @@
 
 global:
   image:
-    registry: "123456789012.dkr.ecr.eu-west-1.amazonaws.com"
+    registry: "910681227783.dkr.ecr.eu-west-1.amazonaws.com"
     project: "mbocak-microservices-demo"
     tag: "dev"
     pullPolicy: IfNotPresent
