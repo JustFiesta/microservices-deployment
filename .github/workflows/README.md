@@ -1,5 +1,11 @@
 TODO
 
+- co tu sie dzieje jak są zorganizowane pliki i za co odpowiadają
+- jakie flow wspierają
+- jakie funkcje udostępniają
+- jak są podzielone composite actions, reusable workflows. czym są i po co są
+- założenia i wymagania do wykorzystania
+
 # GitHub Actions CI/CD
 
 Documentation for workflows and automation.

@@ -1,9 +1,5 @@
 # TODO
 
-- Manifesty k8s dla apki oraz ArgoCD
-- Pipeline dla K8s manifestów - promowanie powinno zmieniać pliki, 
+- Pipeline dla helma CI - powinien sprawdzać czy w ogole jest poprawnie zrobiony
 - Test deploy
-- Poprawki dokumentacji - opis replikacji (od forka do pełnego działania)
-- Dodać HPA controller, Metrics server
-- Dodać Helm bazujące na manifestach
-- Dodać redis
+- Poprawki dokumentacji - spojrzeć na TODO

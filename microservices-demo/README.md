@@ -1,5 +1,10 @@
 TODO
 
+- co to za apka
+- jaką ma architekture, funkcjonalności
+- odwołanie do głównego repo GCP
+
+
 <!-- <p align="center">
 <img src="/src/frontend/static/icons/Hipster_HeroLogoMaroon.svg" width="300" alt="Online Boutique" />
 </p> -->

@@ -1,5 +1,12 @@
 ﻿TODO
 
+- dodać badge: sec skany, helm CI
+- co demonstruje, jakie technologie uzyte, odwołania do poszczególnych folderów
+- założenia i wymagania do działania
+- wymagane zmienne/sekrety
+- jak w pełni zreplikować od 0 do działającego dev (np blokada pushu do maina, wymaganie PRów)
+- local test serwisów z docker compose
+
 # Microservices Demo - AWS Deployment
 
 [![Terraform Apply](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml) [![Build](https://github.com/JustFiesta/microservices-deployment/actions/workflows/ci.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/ci.yaml)
