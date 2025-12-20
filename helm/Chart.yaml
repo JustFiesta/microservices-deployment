@@ -3,4 +3,3 @@ name: microservices-demo
 description: A Helm chart for GCP/microservices-demo application stack
 type: application
 version: 1.0.0 # Helm chart version
-appVersion: "1.0.0" # this does not matter as services in app have independent versions
