@@ -27,6 +27,18 @@ spec:
       - name: main
         image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.loadgenerator) }}
         imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command:
+        - "locust"
+        args:
+        - "-f"
+        - "locustfile.py"
+        - "--host"
+        - "http://frontend:{{ .Values.frontend.port }}"
+        - "--headless"
+        - "-u"
+        - "10"
+        - "-r"
+        - "1"
         env:
         - name: FRONTEND_ADDR
           value: "frontend:{{ .Values.frontend.port }}"
