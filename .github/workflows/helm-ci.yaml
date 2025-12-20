@@ -151,9 +151,11 @@ jobs:
           echo "Bumping version to: $NEW_VERSION"
           yq -i ".version = \"$NEW_VERSION\"" helm/Chart.yaml
 
-          # Commit and push
+          # Commit and push to PR branch
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add helm/Chart.yaml
           git commit -m "chore(helm): bump chart version to $NEW_VERSION"
-          git push
+
+          # Push to the PR head branch
+          git push origin HEAD:${{ github.head_ref }}
