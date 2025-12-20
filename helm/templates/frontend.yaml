@@ -1,80 +1,53 @@
-{{- if .Values.frontend.enabled }}
+{{- if .Values.loadgenerator.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: loadgenerator
   labels:
-    {{- include "microservices-demo.service.labels" (dict "serviceName" "frontend" "component" "frontend" "context" .) | nindent 4 }}
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "loadgenerator" "component" "loadgenerator" "context" .) | nindent 4 }}
 spec:
-  replicas: {{ .Values.frontend.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
-      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "frontend") | nindent 6 }}
+      {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "loadgenerator") | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "microservices-demo.service.labels" (dict "serviceName" "frontend" "component" "frontend" "context" .) | nindent 8 }}
+        {{- include "microservices-demo.service.labels" (dict "serviceName" "loadgenerator" "component" "loadgenerator" "context" .) | nindent 8 }}
     spec:
-      serviceAccountName: frontend
+      serviceAccountName: loadgenerator
       terminationGracePeriodSeconds: 5
+      restartPolicy: Always
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
         runAsNonRoot: true
         runAsUser: 1000
       containers:
-      - name: server
-        image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.frontend) }}
+      - name: main
+        image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.loadgenerator) }}
         imagePullPolicy: {{ .Values.global.image.pullPolicy }}
-        ports:
-        - name: http
-          containerPort: {{ .Values.frontend.port }}
-          protocol: TCP
+        command:
+        - "locust"
+        args:
+        - "-f"
+        - "locustfile.py"
+        - "--host"
+        - "http://frontend:{{ .Values.frontend.port }}"
+        - "--headless"
+        - "-u"
+        - "10"
+        - "-r"
+        - "1"
         env:
-        - name: PORT
-          value: {{ .Values.frontend.port | quote }}
-        - name: PRODUCT_CATALOG_SERVICE_ADDR
-          value: "productcatalogservice:{{ .Values.productcatalogservice.port }}"
-        - name: CURRENCY_SERVICE_ADDR
-          value: "currencyservice:{{ .Values.currencyservice.port }}"
-        - name: CART_SERVICE_ADDR
-          value: "cartservice:{{ .Values.cartservice.port }}"
-        - name: RECOMMENDATION_SERVICE_ADDR
-          value: "recommendationservice:{{ .Values.recommendationservice.port }}"
-        - name: CHECKOUT_SERVICE_ADDR
-          value: "checkoutservice:{{ .Values.checkoutservice.port }}"
-        - name: SHIPPING_SERVICE_ADDR
-          value: "shippingservice:{{ .Values.shippingservice.port }}"
-        - name: AD_SERVICE_ADDR
-          value: "adservice:{{ .Values.adservice.port }}"
-        - name: SHOPPING_ASSISTANT_SERVICE_ADDR
-          value: "shoppingassistantservice:{{ .Values.shoppingassistantservice.port }}"
-        - name: ENABLE_PROFILER
-          value: "0"
+        - name: FRONTEND_ADDR
+          value: "frontend:{{ .Values.frontend.port }}"
+        - name: USERS
+          value: "10"
+        - name: RATE
+          value: "1"
         resources:
-          {{- toYaml .Values.frontend.resources | nindent 10 }}
-        readinessProbe:
-          httpGet:
-            path: /_healthz
-            port: {{ .Values.frontend.port }}
-            httpHeaders:
-            - name: Cookie
-              value: "shop_session-id=x-readiness-probe"
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 5
-          failureThreshold: 3
-        livenessProbe:
-          httpGet:
-            path: /_healthz
-            port: {{ .Values.frontend.port }}
-            httpHeaders:
-            - name: Cookie
-              value: "shop_session-id=x-liveness-probe"
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 5
-          failureThreshold: 3
+          {{- toYaml .Values.loadgenerator.resources | nindent 10 }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -84,64 +57,9 @@ spec:
           readOnlyRootFilesystem: true
 ---
 apiVersion: v1
-kind: Service
-metadata:
-  name: frontend
-  labels:
-    {{- include "microservices-demo.service.labels" (dict "serviceName" "frontend" "component" "frontend" "context" .) | nindent 4 }}
-spec:
-  type: ClusterIP
-  selector:
-    {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "frontend") | nindent 4 }}
-  ports:
-  - name: http
-    port: {{ .Values.frontend.port }}
-    targetPort: {{ .Values.frontend.port }}
-    protocol: TCP
----
-apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: frontend
+  name: loadgenerator
   labels:
-    {{- include "microservices-demo.service.labels" (dict "serviceName" "frontend" "component" "frontend" "context" .) | nindent 4 }}
-{{- if .Values.global.ingress.enabled }}
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: frontend
-  labels:
-    {{- include "microservices-demo.service.labels" (dict "serviceName" "frontend" "component" "frontend" "context" .) | nindent 4 }}
-  {{- with .Values.global.ingress.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-spec:
-  ingressClassName: {{ .Values.global.ingress.className }}
-  {{- if .Values.global.ingress.host }}
-  rules:
-  - host: {{ .Values.global.ingress.host }}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: {{ .Values.frontend.port }}
-  {{- else }}
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: {{ .Values.frontend.port }}
-  {{- end }}
-{{- end }}
+    {{- include "microservices-demo.service.labels" (dict "serviceName" "loadgenerator" "component" "loadgenerator" "context" .) | nindent 4 }}
 {{- end }}

@@ -35,6 +35,12 @@ spec:
           value: {{ .Values.shoppingassistantservice.port | quote }}
         - name: PRODUCT_CATALOG_SERVICE_ADDR
           value: "productcatalogservice:{{ .Values.productcatalogservice.port }}"
+        - name: PROJECT_ID
+          value: {{ .Values.shoppingassistantservice.projectId | default "microservices-demo" | quote }}
+        - name: REGION
+          value: {{ .Values.shoppingassistantservice.region | default "eu-west-1" | quote }}
+        - name: ALLOYDB_DATABASE_NAME
+          value: {{ .Values.shoppingassistantservice.databaseName | default "shopping-assistant-db" | quote }}
         - name: DISABLE_PROFILER
           value: "1"
         resources:
