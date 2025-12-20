@@ -2,4 +2,4 @@ apiVersion: v2
 name: microservices-demo
 description: A Helm chart for GCP/microservices-demo application stack
 type: application
-version: 1.0.2 # Helm chart version
+version: 1.0.3 # Helm chart version
