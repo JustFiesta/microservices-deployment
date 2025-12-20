@@ -20,63 +20,66 @@ global:
 
 loadgenerator:
   enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"  
 
 adservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"  
+    tag: "dev-1.0.0"  
 
 cartservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 checkoutservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 currencyservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 emailservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 frontend:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 paymentservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 productcatalogservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 recommendationservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
 
 shippingservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0"
+    tag: "dev-1.0.0"
