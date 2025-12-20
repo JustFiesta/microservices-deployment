@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'helm/**'
+      - '.github/workflows/helm-*.yaml' 
 
 env:
   HELM_VERSION: '3.14.0'
