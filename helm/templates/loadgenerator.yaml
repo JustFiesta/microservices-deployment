@@ -36,9 +36,9 @@ spec:
         - "http://frontend:{{ .Values.frontend.port }}"
         - "--headless"
         - "-u"
-        - "10"
+        - "{{ .Values.loadgenerator.users | quote }}"
         - "-r"
-        - "1"
+        - "{{ .Values.loadgenerator.spawnRate | quote }}"
         env:
         - name: FRONTEND_ADDR
           value: "frontend:{{ .Values.frontend.port }}"

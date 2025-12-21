@@ -116,6 +116,9 @@ frontend:
 
 loadgenerator:
   enabled: false
+  replicaCount: 0
+  users: 10
+  spawnRate: 1
   image:
     name: loadgenerator
   resources:

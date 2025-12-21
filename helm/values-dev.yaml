@@ -22,7 +22,9 @@ loadgenerator:
   enabled: true
   replicaCount: 1
   image:
-    tag: "dev-1.0.0"  
+    tag: "dev-1.0.0"
+  users: "10"
+  spawnRate: "1"
 
 adservice:
   enabled: true
