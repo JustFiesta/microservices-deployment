@@ -119,6 +119,7 @@ resource "helm_release" "kube_prometheus_stack" {
         storageSpec = {
           volumeClaimTemplate = {
             spec = {
+              storageClassName = "gp2"
               accessModes = ["ReadWriteOnce"]
               resources = {
                 requests = {
