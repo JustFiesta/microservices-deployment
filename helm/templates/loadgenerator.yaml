@@ -37,6 +37,8 @@ spec:
         - "--headless"
         - "-u"
         - {{ .Values.loadgenerator.users | quote }}
+        - "-r"
+        - {{ .Values.loadgenerator.spawnRate | quote }}
         resources:
           {{- toYaml .Values.loadgenerator.resources | nindent 10 }}
         securityContext:
