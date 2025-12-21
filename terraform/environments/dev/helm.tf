@@ -103,7 +103,7 @@ resource "helm_release" "kube_prometheus_stack" {
   values = [yamlencode({
     prometheus = {
       prometheusSpec = {
-        retention = "7d"
+        retention = "2h"
         
         resources = {
           requests = {
@@ -113,20 +113,6 @@ resource "helm_release" "kube_prometheus_stack" {
           limits = {
             cpu    = "500m"
             memory = "1Gi"
-          }
-        }
-
-        storageSpec = {
-          volumeClaimTemplate = {
-            spec = {
-              storageClassName = "gp3"
-              accessModes = ["ReadWriteOnce"]
-              resources = {
-                requests = {
-                  storage = "10Gi"
-                }
-              }
-            }
           }
         }
       }
