@@ -3,8 +3,8 @@ name: ArgoCD Apps Sync
 on:
   pull_request:
     paths:
-    - 'argocd/apps/**'
-    - '.github/workflows/argocd-apps-sync.yaml'
+    - 'argocd/**'
+    - '.github/workflows/argocd-apps-cicd.yaml'
   push:
     branches:
     - main
