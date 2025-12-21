@@ -101,6 +101,11 @@ frontend:
   image:
     name: frontend
   port: 8080
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPU: 70
   resources:
     requests:
       cpu: 100m
