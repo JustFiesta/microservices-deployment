@@ -119,7 +119,7 @@ resource "helm_release" "kube_prometheus_stack" {
         storageSpec = {
           volumeClaimTemplate = {
             spec = {
-              storageClassName = "gp2"
+              storageClassName = "gp3"
               accessModes = ["ReadWriteOnce"]
               resources = {
                 requests = {
@@ -167,5 +167,8 @@ resource "helm_release" "kube_prometheus_stack" {
     }
   })]
 
-  depends_on = [kubernetes_namespace.monitoring]
+  depends_on = [
+    kubernetes_namespace.monitoring,
+    kubernetes_storage_class.gp3
+  ]
 }
