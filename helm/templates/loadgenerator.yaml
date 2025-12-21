@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "microservices-demo.service.labels" (dict "serviceName" "loadgenerator" "component" "loadgenerator" "context" .) | nindent 4 }}
 spec:
-  replicas: {{ .Values.loadgenerator.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
       {{- include "microservices-demo.service.selectorLabels" (dict "serviceName" "loadgenerator") | nindent 6 }}
@@ -27,20 +27,23 @@ spec:
       - name: main
         image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.loadgenerator) }}
         imagePullPolicy: {{ .Values.global.image.pullPolicy }}
-        env:
-        - name: FRONTEND_ADDR
-          value: "frontend:{{ .Values.frontend.port }}"
-        - name: USERS
-          value: {{ .Values.loadgenerator.users | quote }}
-        - name: RATE
-          value: {{ .Values.loadgenerator.spawnRate | quote }}
+        command:
+        - "locust"
+        args:
+        - "-f"
+        - "locustfile.py"
+        - "--host"
+        - "http://frontend:{{ .Values.frontend.port }}"
+        - "--headless"
+        - "-u"
+        - {{ .Values.loadgenerator.users | quote }}
         resources:
           {{- toYaml .Values.loadgenerator.resources | nindent 10 }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
-            - ALL
+              - ALL
           privileged: false
           readOnlyRootFilesystem: true
 ---
