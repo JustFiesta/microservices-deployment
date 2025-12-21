@@ -34,7 +34,7 @@ jobs:
     - name: Validate YAML syntax
       run: |
         echo "Validating YAML files..."
-        for file in argocd/apps/*.yaml; do
+        for file in argocd/*.yaml; do
           echo "Checking $file"
           kubectl apply --dry-run=client -f "$file" || exit 1
         done
@@ -42,7 +42,7 @@ jobs:
     - name: Check for required fields
       run: |
         echo "Checking ArgoCD Application manifests..."
-        for file in argocd/apps/*.yaml; do
+        for file in argocd//*.yaml; do
           echo "Validating $file"
 
           # Check if it's an Application resource
@@ -71,7 +71,7 @@ jobs:
     - name: Validate with ArgoCD
       run: |
         echo "Validating with ArgoCD CLI..."
-        for file in argocd/apps/*.yaml; do
+        for file in argocd//*.yaml; do
           echo "Validating $file with ArgoCD"
           argocd app validate -f "$file" || echo "Warning: $file validation failed (might be ok if ArgoCD server is not accessible)"
         done
@@ -82,13 +82,13 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const files = fs.readdirSync('argocd/apps').filter(f => f.endsWith('.yaml'));
+          const files = fs.readdirSync('argocd/').filter(f => f.endsWith('.yaml'));
 
           let comment = '## ArgoCD Applications Validation\n\n';
           comment += `Found ${files.length} ArgoCD Application(s):\n\n`;
 
           for (const file of files) {
-            const content = fs.readFileSync(`argocd/apps/${file}`, 'utf8');
+            const content = fs.readFileSync(`argocd//${file}`, 'utf8');
             const lines = content.split('\n');
             const name = lines.find(l => l.includes('name:'))?.split(':')[1]?.trim();
             const env = lines.find(l => l.includes('environment:'))?.split(':')[1]?.trim();
@@ -108,7 +108,7 @@ jobs:
           comment += '  kubectl apply -f argocd/ -n argocd\n';
           comment += '  \n';
           comment += '  # Or for specific environment:\n';
-          comment += '  # kubectl apply -f argocd/apps/dev/ -n argocd\n';
+          comment += '  # kubectl apply -f argocd//dev/ -n argocd\n';
           comment += '  ```\n';
           comment += '- Check ArgoCD UI for sync status\n';
 
