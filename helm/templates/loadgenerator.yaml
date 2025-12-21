@@ -28,16 +28,12 @@ spec:
         image: {{ include "microservices-demo.image" (dict "context" . "service" .Values.loadgenerator) }}
         imagePullPolicy: {{ .Values.global.image.pullPolicy }}
         env:
-        - name: LOCUST_HOST
-          value: "http://frontend:{{ .Values.frontend.port }}"
-        - name: LOCUST_USERS
+        - name: FRONTEND_ADDR
+          value: "frontend:{{ .Values.frontend.port }}"
+        - name: USERS
           value: {{ .Values.loadgenerator.users | quote }}
-        - name: LOCUST_SPAWN_RATE
+        - name: RATE
           value: {{ .Values.loadgenerator.spawnRate | quote }}
-        - name: LOCUST_HEADLESS
-          value: "true"
-        - name: LOCUST_LOCUSTFILE
-          value: "locustfile.py"
         resources:
           {{- toYaml .Values.loadgenerator.resources | nindent 10 }}
         securityContext:
