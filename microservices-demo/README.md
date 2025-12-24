@@ -3,6 +3,12 @@ TODO
 - co to za apka
 - jaką ma architekture, funkcjonalności
 - odwołanie do głównego repo GCP
+- totalnie nowe readme, zostawić tylko info stricte że to online buitique, jak jest stworzony, architekture, diagramy. reszta to odwołanie do OG repo
+- wyjaśnić jak go uruchomić na localu (docker-compsoe)
+- jak są zbudowane dockerfiles (dobrane pod minimal overhaed i najmniejszy jak to mozliwe rozmiar)
+- co robi kazdy serwis króciutko
+- można wykorzystać części obecnego readme
+- krótko, treściwie i technicznie
 
 
 <!-- <p align="center">

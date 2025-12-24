@@ -5,6 +5,7 @@ TODO
 - jakie funkcje udostępniają
 - jak są podzielone composite actions, reusable workflows. czym są i po co są
 - założenia i wymagania do wykorzystania
+- krótkie wyjaśnienia kazdego worfklow
 
 # GitHub Actions CI/CD
 

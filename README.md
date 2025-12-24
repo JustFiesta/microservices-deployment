@@ -1,11 +1,13 @@
 ﻿TODO
 
 - dodać badge: sec skany, helm CI
-- co demonstruje, jakie technologie uzyte, odwołania do poszczególnych folderów
-- założenia i wymagania do działania
+- co demonstruje, jakie technologie uzyte, odwołania do poszczególnych folderów i ich readme po więcej info - przedstawia pełny deployment pełnoskalowej apki mikroserwisowej z wykorzystaniem pełnych automatyzacji devops - przejrzyj foldery to zobnaczysz o co chodzi. wspiera multi env, gitops deployment, full CICD (poza argo apps), argocd do deploymentu i rollbackow, pakowane przez helm
+- założenia i wymagania do działania - sekrety, kubectl, aws jedno konto, aws cli, terraform (do testów), 
 - wymagane zmienne/sekrety
 - jak w pełni zreplikować od 0 do działającego dev (np blokada pushu do maina, wymaganie PRów)
 - local test serwisów z docker compose
+- diagram pełnego deploymentu - aws + argo + workflowy
+- krótko, treściwie i technicznie
 
 # Microservices Demo - AWS Deployment
 

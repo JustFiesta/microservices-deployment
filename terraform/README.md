@@ -1,12 +1,13 @@
 TODO
 
-- co to terraform
-- jak jest zorganizowane wszystko
-- jaki flow wspiera
-- dlaczego global jest zawsze ważne
+- dlaczego tf?
+- jak jest zorganizowane wszystko w tym folderze
+- jaki flow wspiera (jak tworzyć envy, jak wykorzystywać moduły z plików, dlaczego dev jest auto-mode (booo moj aws inaczej nie działa, można je dostosowywać zgodnie z dokumentacjami wykorzystanych modułów od AWS))
+- dlaczego global jest zawsze potrzebne
 - jak ECR jest ogarniany (jeden dla wszystkich envow)
 - jak używać/dodawać envy, edytować itp
 - graf deva
+- krótko, treściwie i technicznie
 
 # Terraform Infrastructure
 
