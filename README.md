@@ -2,9 +2,10 @@
 
 [![Terraform Apply](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/terraform-apply.yaml) [![Build](https://github.com/JustFiesta/microservices-deployment/actions/workflows/ci.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/ci.yaml) [![Helm Chart CI](https://github.com/JustFiesta/microservices-deployment/actions/workflows/helm-ci.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/helm-ci.yaml) [![Security Scans](https://github.com/JustFiesta/microservices-deployment/actions/workflows/security-scans.yaml/badge.svg)](https://github.com/JustFiesta/microservices-deployment/actions/workflows/security-scans.yaml)
 
-## About
-
 This project demonstrates a complete DevOps automation pipeline for deploying a microservices application on AWS. Based on [Google Cloud's microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo), it showcases modern cloud-native practices and enterprise-grade CI/CD workflows.
+
+Focus went to ease the collaboration of developers and operators. Mundane tasks are automated, checks are perfomed automatically, so the information might flow from one to the other. Quality is enforced, no main branch pushes are acceptable, PRs are main way of communicating.  
+Made with flexible approach such as DRY/KISS, can be modified easily (more envs, reusable workflows, versioning changes, etc.)
 
 **What This Project Demonstrates**:
 
