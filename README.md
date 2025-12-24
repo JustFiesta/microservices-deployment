@@ -7,6 +7,8 @@ This project demonstrates a complete DevOps automation pipeline for deploying a 
 Focus went to ease the collaboration of developers and operators. Mundane tasks are automated, checks are perfomed automatically, so the information might flow from one to the other. Quality and small batches are enforced, no main branch pushes are acceptable, PRs are main way of communicating.  
 Made with flexible approach such as DRY/KISS, can be modified easily (more envs, reusable workflows, versioning changes, etc.)
 
+Made as a demonstation/educational - not expected to be used in real world, but can be nontheless.
+
 **What This Project Demonstrates**:
 
 - **Full GitOps Workflow**: Pull Request-based deployments with ArgoCD continuous delivery
@@ -19,7 +21,7 @@ Made with flexible approach such as DRY/KISS, can be modified easily (more envs,
 - **Modular CI/CD**: Reusable GitHub Actions workflows and composite actions following DRY principles
 - **Changes detection**: Terraform and image workflows detect only changed environments/services
 
-### Technology Stack
+## Technology Stack
 
 | Category | Technologies |
 |----------|-------------|
@@ -36,9 +38,11 @@ Made with flexible approach such as DRY/KISS, can be modified easily (more envs,
 | **Validation Tools** | Kubeconform (Kubernetes manifest validation) |
 | **Application Languages** | Go, Java, Python, Node.js, C# (.NET) |
 
+---
+
 ## Project Structure
 
-```
+```shell
 .
 ├── .github/                       # GitHub Actions CI/CD automation
 │   ├── actions/                   # Composite actions (Terraform init/validate/plan)
@@ -73,6 +77,8 @@ Made with flexible approach such as DRY/KISS, can be modified easily (more envs,
 | **`microservices-demo/`** | Application code | 12 polyglot microservices from Google Cloud demo | [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) |
 | **`docker-compose.yaml`** | Local development | Run all 12 services locally for testing | See [Local Testing](#local-testing) section |
 
+---
+
 ## Architecture & Design Decisions
 
 ### Infrastructure Architecture
@@ -100,7 +106,7 @@ Made with flexible approach such as DRY/KISS, can be modified easily (more envs,
     ```
 - **Build Trigger**: Container images built on PR creation (not on merge to main)
   - **Why**: Fast feedback, immutable versioned artifacts, shift-left security scanning
-- **Semantic Versioning**: Auto-increment patch version per service independently (e.g., `frontend-1.2.5` → `frontend-1.2.6`)
+- **Semantic Versioning**: Auto-increment patch version per service independently (e.g., `frontend-1.2.5` > `frontend-1.2.6`)
   - Each microservice maintains its own version number
   - Version tracked in git tags (e.g., `frontend-1.2.6`)
 - **Multi-Tag Strategy**: Each build creates multiple tags per service:
@@ -118,6 +124,8 @@ Made with flexible approach such as DRY/KISS, can be modified easily (more envs,
 - **IAM Controls**: Boundary policies, least-privilege roles, separate cluster and node roles
 - **Encryption**: S3 backend encrypted (AES256), ECR encryption enabled
 
+---
+
 ## Pipelines
 
 | Workflow | Trigger | Purpose | Key Actions |
@@ -130,6 +138,8 @@ Made with flexible approach such as DRY/KISS, can be modified easily (more envs,
 | **security-scans.yaml** | Cron (Mon 6AM UTC) + manual | Security vulnerability scanning | Trivy scan all ECR images, SARIF upload to GitHub Security |
 
 **Implementation Details**: See [.github/workflows/README.md](.github/workflows/README.md) for workflow architecture, reusable workflows, and composite actions.
+
+---
 
 ## Prerequisites & Requirements
 
@@ -156,6 +166,7 @@ Your AWS user/role needs permissions for:
 - **CloudFormation**: Read stack status (EKS uses CFN internally)
 
 **IAM Boundary Policy Note**:
+
 - Some AWS environments (AWS Academy, organizational accounts) enforce IAM Permission Boundaries
 - If your account has boundary policies, you may need to remove/modify boundary configuration in `terraform/environments/dev/iam.tf`
 - For development without boundaries: Comment out or remove `permissions_boundary` lines in IAM role definitions
@@ -169,7 +180,7 @@ Your AWS user/role needs permissions for:
 
 ## Required GitHub Secrets/Variables
 
-Configure these in **Settings → Secrets and variables → Actions**:
+Configure these in **Settings > Secrets and variables > Actions**:
 
 ### Repository Secrets
 
@@ -189,6 +200,8 @@ Configure these in **Settings → Secrets and variables → Actions**:
 | `TERRAFORM_VERSION` | Terraform version for workflows | `1.9.0` |
 
 **Important**: `ECR_REGISTRY_URI` must include the project name prefix (e.g., `/yours-microservices-demo`), matching `project_name` in `terraform/environments/global/local-vars.tf`.
+
+---
 
 ## Full Replication Guide (0 to Working Dev Environment)
 
@@ -230,7 +243,7 @@ terraform {
 
 #### 3. Set GitHub Secrets/Variables
 
-**Repository Secrets** (Settings → Secrets and variables → Actions):
+**Repository Secrets** (Settings > Secrets and variables > Actions):
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
@@ -266,6 +279,7 @@ aws iam get-user --user-name $(aws sts get-caller-identity --query 'Arn' --outpu
 ```
 
 **If you have NO boundary policy** (standard AWS account):
+
 - Edit `terraform/environments/dev/iam.tf`
 - **Remove or comment out** all `permissions_boundary` lines:
 
@@ -285,6 +299,7 @@ resource "aws_iam_role" "eks_node_role" {
 ```
 
 **If you have a boundary policy** (AWS Academy, organizational AWS):
+
 - Keep the `permissions_boundary` lines
 - Update the ARN to match your account's boundary policy
 - Example: `permissions_boundary = "arn:aws:iam::123456789012:policy/YourBoundaryPolicy"`
@@ -295,7 +310,7 @@ resource "aws_iam_role" "eks_node_role" {
 
 **IMPORTANT**: Deploy in TWO separate PRs due to "one environment per PR" constraint.
 
-**Step 5a: Deploy Global Resources (ECR Repositories)**
+##### Step 5a: Deploy Global Resources (ECR Repositories)
 
 Create ECR repositories first - they must exist before building images:
 
@@ -307,11 +322,11 @@ git add terraform/environments/global/
 git commit -m "terraform(global): create ECR repositories"
 git push origin terraform/deploy-global
 
-# Create PR → Review terraform plan for 12 ECR repos → Merge to main
-# Workflow automatically applies → ECR repositories created
+# Create PR > Review terraform plan for 12 ECR repos > Merge to main
+# Workflow automatically applies > ECR repositories created
 ```
 
-**Step 5b: Deploy Dev Environment (EKS Cluster)**
+##### Step 5b: Deploy Dev Environment (EKS Cluster)
 
 After global deployment completes, deploy dev infrastructure:
 
@@ -325,12 +340,13 @@ git add terraform/environments/dev/
 git commit -m "terraform(dev): create EKS cluster and VPC"
 git push origin terraform/deploy-dev
 
-# Create PR → Review terraform plan → Merge to main
-# Workflow automatically applies → EKS cluster + VPC + Helm components deployed
+# Create PR > Review terraform plan > Merge to main
+# Workflow automatically applies > EKS cluster + VPC + Helm components deployed
 # This takes ~15-20 minutes (EKS cluster creation)
 ```
 
 **Why Two PRs?**
+
 - Terraform workflows enforce one environment change per PR
 - ECR must exist before image CI can push
 - Clear separation of concerns (global resources vs environment-specific)
@@ -339,7 +355,8 @@ To create new environments (qa, prod), copy `dev/` and adjust configuration (see
 
 #### 6. Configure Branch Protection
 
-**In GitHub UI** (Settings → Branches):
+**In GitHub UI** (Settings > Branches):
+
 1. Add rule for `main` branch
 2. Enable: "Require status checks to pass before merging"
 3. Enable: "Do not allow bypassing the above settings"
@@ -349,6 +366,7 @@ This ensures all changes go through PR review and automated checks (Terraform pl
 #### 7. Verify Infrastructure & Access ArgoCD
 
 After infrastructure deployment completes (Step 5), Terraform automatically installs via Helm:
+
 - **ArgoCD** (GitOps CD)
 - **NGINX Ingress Controller** (LoadBalancer)
 - **Metrics Server** (HPA support)
@@ -401,7 +419,7 @@ ArgoCD will automatically sync the Helm chart from `helm/` directory using envir
 
 #### 8. First Application Build & Deployment
 
-**Option A: Build Single Service (Frontend)**
+##### Option A: Build Single Service (Frontend)
 
 ```bash
 # Make a change to trigger CI build for one service
@@ -411,11 +429,11 @@ git add microservices-demo/src/frontend/
 git commit -m "feat(frontend): test CI pipeline"
 git push origin feature/test-deployment
 
-# Create PR → CI builds ONLY frontend image → Merge to main
+# Create PR > CI builds ONLY frontend image > Merge to main
 # ArgoCD automatically deploys new frontend image to dev environment
 ```
 
-**Option B: Build ALL Services (Initial Deployment)**
+##### Option B: Build ALL Services (Initial Deployment)
 
 Use this for first deployment to build all 12 microservices at once:
 
@@ -431,7 +449,7 @@ git add microservices-demo/src/
 git commit -m "ci: trigger initial build for all services"
 git push origin feature/initial-build
 
-# Create PR → CI builds ALL 12 services in parallel → Merge to main
+# Create PR > CI builds ALL 12 services in parallel > Merge to main
 # ArgoCD automatically deploys all services to dev environment
 ```
 
@@ -488,6 +506,7 @@ docker-compose up --build cartservice
 ### Architecture
 
 The `docker-compose.yaml` includes:
+
 - **12 microservices**: All services from `microservices-demo/src/`
 - **Redis**: For cart service state
 - **Networking**: All services on `microservices-network` bridge network
@@ -503,3 +522,11 @@ The `docker-compose.yaml` includes:
 4. **CI validation**: GitHub Actions builds and pushes images to ECR
 5. **Merge**: After approval, merge to main
 6. **ArgoCD deployment**: ArgoCD automatically deploys to dev environment
+
+---
+
+## Contribution
+
+I do not expect any contribuions. Feel free to use this project as example of deployment or for educational purposes.
+
+Any new ideas are welcome.
