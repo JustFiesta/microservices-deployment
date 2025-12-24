@@ -1,185 +1,256 @@
-TODO
-
-- co to terraform
-- jak jest zorganizowane wszystko
-- jaki flow wspiera
-- dlaczego global jest zawsze ważne
-- jak ECR jest ogarniany (jeden dla wszystkich envow)
-- jak używać/dodawać envy, edytować itp
-- graf deva
-
 # Terraform Infrastructure
 
-Documentation for AWS infrastructure managed by Terraform.
+Complete Infrastructure as Code for AWS microservices-demo deployment using Terraform. Splitted in multi environment configuration.
 
-## Contents
+## Architecture
 
-```
+### Shared and Environment-Specific Resources
+
+This project separates infrastructure into two distinct categories:
+
+**Shared Resources (`global/`)**:
+
+- **ECR Repositories**: Single registry for all environments
+- **Image Storage**: All environments pull from same repositories
+
+**Environment-Specific Resources (`dev/`, `qa/`, `prod/`)**:
+
+- **VPC & Networking**: Isolated network per environment
+- **EKS Cluster**: Separate Kubernetes control plane per environment
+- **IAM Roles**: Environment-specific permissions
+- **Helm Deployments**: ArgoCD, NGINX, Prometheus/Grafana
+
+### Global ECR
+
+**All environments share a single ECR registry** (`global/ecr.tf`). This is not optional - workflows depend on it:
+
+1. **CI Pipeline** (`ci.yaml`): Pushes images to shared ECR with environment tags (`dev-1.2.3`, `qa-1.2.3`)
+2. **Image Promotion** (`promote-image.yaml`): Crane copies tags within same repository (dev → qa)
+3. **ArgoCD**: Pulls images from shared ECR using environment-specific tags
+
+**Without global ECR**: Image promotion workflows would fail, requiring full rebuilds per environment.
+
+---
+
+## Directory Structure
+
+```shell
 terraform/
-└── environments/
-    ├── dev/                    # Dev environment (EKS + VPC + IAM)
-    │   ├── backend.tf          # S3 backend configuration
-    │   ├── providers.tf        # AWS provider setup
-    │   ├── local-vars.tf       # Local variables and tags
-    │   ├── vpc.tf              # VPC, subnets, NAT Gateway
-    │   ├── iam.tf              # IAM roles for EKS cluster and nodes
-    │   ├── eks.tf              # EKS cluster configuration
-    │   └── outputs.tf          # Outputs (cluster endpoint, etc.)
-    └── global/                 # Shared resources
-        ├── backend.tf          # S3 backend configuration
-        ├── providers.tf        # AWS provider setup
-        ├── local-vars.tf       # Local variables
-        ├── ecr.tf              # ECR repositories (auto-discovery)
-        └── outputs.tf          # Outputs (repository URLs)
+└── environments/         # Environment-based organization
+    ├── global/           # Shared resources across ALL environments
+    │   ├── backend.tf    # S3 state: state/global/terraform.tfstate
+    │   ├── providers.tf  # AWS provider configuration
+    │   ├── versions.tf   # Terraform & provider version constraints
+    │   ├── local-vars.tf # Project name, tags
+    │   ├── ecr.tf        # ECR repositories (AUTO-DISCOVERED from src/)
+    │   └── outputs.tf    # ECR repository URLs
+    │
+    └── dev/              # Dev environment (can be copied for qa, prod, etc.)
+        ├── backend.tf        # S3 state: state/dev/terraform.tfstate
+        ├── providers.tf      # AWS provider + Kubernetes + Helm providers
+        ├── versions.tf       # Version constraints
+        ├── local-vars.tf     # Environment-specific: VPC name, cluster name, tags
+        ├── vpc.tf            # VPC module: subnets, NAT, IGW
+        ├── security-groups.tf # Security groups for EKS
+        ├── iam.tf            # IAM roles: EKS cluster + node roles
+        ├── eks.tf            # EKS module: cluster, node pools, add-ons
+        ├── helm.tf           # Helm releases: ArgoCD, NGINX, Prometheus, Metrics Server
+        └── outputs.tf        # Cluster endpoint, kubeconfig command
 ```
+
+### File Responsibility Matrix
+
+| File | Purpose | Shared Across Envs? | Notes |
+|------|---------|---------------------|-------|
+| **ecr.tf** (global only) | ECR repositories | ✅ **Shared across ALL envs** | Auto-discovered from `src/*/Dockerfile` |
+| **backend.tf** | S3 state storage | ❌ Each env has own state file | Prevents state conflicts |
+| **providers.tf** | AWS/K8s/Helm provider setup | ❌ Env-specific credentials | K8s provider uses env-specific cluster |
+| **vpc.tf** | VPC, subnets, NAT, IGW | ❌ Different CIDR per env | Network isolation |
+| **eks.tf** | EKS cluster configuration | ❌ Different config per env | Dev uses auto mode, prod should use managed nodes |
+| **iam.tf** | IAM roles for EKS | ❌ Env-specific role names | Dev may use boundary policies, prod should not |
+| **helm.tf** | Helm chart deployments | ❌ Env-specific values | ArgoCD, NGINX, monitoring stack |
+| **versions.tf** | Version constraints | ✅ Should be identical | Consistency across environments |
+| **outputs.tf** | Terraform outputs | ❌ Env-specific values | Endpoints, etc. |
+
+---
 
 ## Environments
 
 ### `global/` - Shared Resources
 
-**Purpose**: Create resources shared across all environments. Without them workflows might not work.
+Shared resources treated like global environment. To enable multi environment strategy and omit creation of many ENV variables in GitHub I went with monorepo for all images. It eases the interaction and configuration.
 
-**Resources**:
+Made as container for resources shared across all environments. Required for CI/CD workflows.
 
-- **ECR Repositories**: Auto-discovered from microservices, one repository per service
-  - Repository naming: `<project-name>/<service>` (e.g., `microservices-demo/frontend`)
-  - Scanning: Auto-scan on push
-  - Encryption: AES256
-  - Lifecycle policies: Automatic cleanup of old images
+**Key Resources**:
 
-**Why global?**
+1. **ECR Repositories** (Auto-Discovered)
+   - Terraform scans `microservices-demo/src/*/Dockerfile`
+   - Creates one repository per service: `<project-name>/<service>`
+   - Example: `test-microservices-demo/frontend`
+   - Adding new service: Add Dockerfile → Terraform auto-creates repository
 
-- Single ECR repository set shared across all environments
-- Images promoted dev→qa→prod use same repositories
-- Cost reduction (no image duplication)
-- Simplified version management
+2. **Lifecycle Policies**
+   - Keep last 5 `dev-*` tagged images per service
+   - Expire untagged images after 1 day
+   - Keep max 10 images total (catch-all)
 
-**ECR Repository Structure**:
+**Deployment Order**: Deploy `global/` FIRST before any environment. See [Pipeline Integration](#pipeline-integration).
 
-```
-Full repository name: mbocak-microservices-demo/frontend
-Full image URI:       910681227783.dkr.ecr.eu-west-1.amazonaws.com/mbocak-microservices-demo/frontend:1.2.3
+**Example Repository Structure**:
+
+```txt
+Full repository name: test-microservices-demo/frontend
+Full image URI:       123456789010.dkr.ecr.eu-west-1.amazonaws.com/test-microservices-demo/frontend:dev-1.2.3
 
 Where:
-  910681227783.dkr.ecr.eu-west-1.amazonaws.com   = Registry URI
-  mbocak-microservices-demo                      = Project name (prefix)
+  123456789010.dkr.ecr.eu-west-1.amazonaws.com   = Registry URI
+  test-microservices-demo                      = Project name (prefix)
   frontend                                       = Service name
-  1.2.3                                          = Image tag
+  dev-1.2.3                                      = Environment + version tag
 ```
-
-**Auto-Discovery (ecr.tf)**:
-
-Terraform automatically discovers microservices by scanning for Dockerfiles:
-
-```hcl
-locals {
-  microservices_path = "${path.root}/../../../microservices-demo/src"
-  service_dirs       = fileset(local.microservices_path, "*/Dockerfile")
-  services           = toset([for dir in local.service_dirs : dirname(dir)])
-}
-
-resource "aws_ecr_repository" "microservices" {
-  for_each = local.services  # Dynamic!
-  name     = "${local.project_name}/${each.key}"
-}
-```
-
-**Process**:
-
-1. Scans `microservices-demo/src/*/Dockerfile`
-2. Finds: `frontend/`, `cartservice/`, `adservice/`, etc.
-3. Creates ECR repository for each: `mbocak-microservices-demo/frontend`, etc.
-4. Adding new service = add Dockerfile → Terraform auto-creates repository
-
-**Lifecycle Policies**:
-
-| Priority | Rule | Description |
-|----------|------|-------------|
-| 1 | Keep last 5 `dev-*` tags | Retain 5 newest dev versions |
-| 2 | Expire untagged after 1 day | Remove build artifacts |
-| 3 | Keep max 10 images | Catch-all limit |
-
-**Why these policies?** Storage cost optimization, dev iterates quickly, untagged images are unnecessary intermediate layers.
 
 ### `dev/` - Development Environment
 
-**Purpose**: Complete Kubernetes infrastructure for development.
+Sample development env with EKS in auto-mode and IAM policy boundaries. Suited for tests, configuration, or small deployment.
 
-**Resources**: VPC, EKS Cluster, IAM Roles - see files in `terraform/environments/dev/` for configuration details.
+**Environment-Specific Characteristics**:
 
-**Key Configuration**:
+- **EKS Auto Mode**: Enabled for simplified management
+  - AWS manages node provisioning, scaling, patching
+  - Reduced operational overhead for development
+  - **Why auto mode for dev**: Fast setup, minimal maintenance, cost-effective
+  - **Any other environment should NOT use auto mode**: Use managed node groups for control
 
-- VPC CIDR: `10.1.0.0/16` (2 AZs: eu-west-1a, eu-west-1b)
-- EKS version: `1.34`
-- Single NAT Gateway (cost optimization for dev)
-- Public endpoint (dev convenience)
+- **IAM Boundary Policies**: May be enabled for AWS Academy/organizational accounts
+  - Restricts what IAM roles can be created
+  - **Any other environment should NOT use boundary policies**: Standard AWS accounts don't require them
+  - See `iam.tf` for configuration
 
-**For production environments**: Use multi-AZ NAT Gateway, private endpoint, and production node pools.
+- **Network Design**: Single NAT Gateway for cost optimization
+  - **Production should use**: Multi-AZ NAT Gateway for high availability
+
+- **Public API Endpoint**: EKS API publicly accessible for developer convenience
+  - **Production should use**: Private endpoint with VPN/bastion access
+
+**Terraform-Managed Helm Deployments**:
+
+All Kubernetes tooling installed automatically via Terraform (`helm.tf`):
+
+- **ArgoCD**: GitOps continuous delivery
+- **NGINX Ingress Controller**: LoadBalancer for application access
+- **Metrics Server**: Horizontal Pod Autoscaler support
+- **Prometheus & Grafana**: Monitoring and observability
+
+### Creating Additional Environments (`qa`, `prod`)
+
+Create new S3 manually. Copy `dev/` directory and adjust configuration.
+
+**Key Differences for any deployment environment**:
+
+| Aspect | Dev | Other |
+|--------|-----|------------|
+| **EKS Mode** | Auto mode | Managed node groups |
+| **IAM Boundaries** | May be enabled (AWS Academy) | Should NOT be enabled |
+| **NAT Gateway** | Single (cost optimization) | Multi-AZ (high availability) |
+| **API Endpoint** | Public (developer access) | Private (VPN/bastion) |
+| **VPC CIDR** | `10.1.0.0/16` | Unique per environment (avoid conflicts) |
+| **S3 State Key** | `state/dev/terraform.tfstate` | `state/prod/terraform.tfstate` |
+
+**Steps**:
+
+0. Create new S3 bucket manually
+1. Copy `dev/` to new environment: `cp -r dev prod`
+2. Update `backend.tf`: Change S3 state key to `state/prod/terraform.tfstate`
+3. Update `local-vars.tf`: Change `env` tag to `"prod"`
+4. Update `vpc.tf`: Change CIDR to avoid conflicts with other environments
+5. Update `eks.tf`: Disable auto mode, configure managed node groups
+6. Update `iam.tf`: Remove boundary policies if using standard AWS account
+7. Update `helm.tf`: Adjust resource limits, retention policies for production
+
+**Important**: Each environment requires separate PR for deployment. See [Pipeline Integration](#pipeline-integration).
+
+---
+
+## Pipeline Integration
+
+**Terraform workflows auto-discover environments** by scanning `terraform/environments/` directory.
+
+**Critical Workflows**:
+
+- `terraform-ci.yaml`: Detects changed environments, runs plan, posts to PR comments
+- `terraform-apply.yaml`: Auto-applies after merge to main
+- See [.github/README.md](../.github/README.md) for complete workflow documentation
+
+**Deployment Order Constraint**:
+
+1. **Deploy `global/` FIRST** (separate PR)
+   - Creates ECR repositories
+   - Required for CI pipeline to push images
+
+2. **Deploy environments** (`dev/`, `qa/`, `prod/`) (separate PRs)
+   - One environment per PR (workflow limitation)
+   - Uses ECR repositories from global
+
+**Required GitHub Variables**:
+
+All environments share the same variables:
+- `ECR_REGISTRY_URI`: Full ECR registry URI with project prefix
+- `AWS_REGION`: AWS region for all resources
+- Example: `ECR_REGISTRY_URI=123456789010.dkr.ecr.eu-west-1.amazonaws.com/test-microservices-demo`
+- Note: Include project name prefix in URI
+
+**Auto-Discovery Mechanism**:
+
+```bash
+# Workflow discovers environments
+find terraform/environments -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
+# Output: global, dev, qa, prod
+
+# Workflow detects changes per environment
+git diff --name-only base..HEAD | grep "terraform/environments/"
+# Extracts environment name from changed file paths
+```
+
+---
 
 ## How to Use
 
-### Initial Setup and Deployment
+To change and deploy infrastructure focus on one env per PR, and work as with any other Terraform HCL format files.  
+Change file > create branch > create PR > check workflow output information > merge (auto-apply)
 
-See [Main README](../README.md#replication-guide) for complete setup instructions including:
+Modules used are publiclly available and have great documentation. One can configure them accordingly to deployment needs.
+
+Same goes for confiuration files (iam, local-vars, outputs, security-groups, prviders, helm, etc.).
+
+### Modules reference
+
+- [EKS module](https://registry.terraform.io/modules/terraform-aws-modules/eks/aws/latest)
+- [VPC](https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws)
+
+### Initial Setup
+
+See [Main README](../README.md#replication-guide) for complete setup instructions:
+
 - Creating S3 backend
 - Configuring GitHub secrets/variables
-- Deploying infrastructure via workflows
-
-### Adding New Environment (qa, prod)
-
-#### 1. Copy dev environment
-
-```bash
-cd terraform/environments
-cp -r dev qa
-```
-
-#### 2. Update configuration
-
-```hcl
-# terraform/environments/qa/backend.tf
-terraform {
-  backend "s3" {
-    key = "state/qa/terraform.tfstate"  # Change
-  }
-}
-
-# terraform/environments/qa/local-vars.tf
-locals {
-  tags = {
-    env = "qa"  # Change
-  }
-}
-
-# terraform/environments/qa/vpc.tf
-cidr = "10.2.0.0/16"  # Change CIDR
-```
-
-**Recommended VPC CIDRs**:
-
-- Dev: `10.1.0.0/16`
-- QA: `10.2.0.0/16`
-- Prod: `10.3.0.0/16`
-
-#### 3. Adjust resources for environment
+- Deploying infrastructure via workflows (global first, then dev)
 
 ### Modifying Existing Environment
 
-**Deploy via GitHub Workflows** (recommended):
+Deploy via GitHub Workflows using PRs:
 
 ```bash
 git checkout -b terraform/upgrade-eks
-vim terraform/environments/dev/eks.tf
+vim terraform/environments/dev/eks.tf # make some change to Trigger CI
 git add terraform/
-git commit -m "terraform(dev): upgrade EKS to 1.35"
+git commit -m "terraform(dev): upgrade EKS configuration"
 git push origin terraform/upgrade-eks
 
-# Create PR → Review plan in comments → Merge → Automatic apply
+# Create PR → Review terraform plan in comments → Merge → Automatic apply
 ```
 
-See [.github/README.md](../.github/README.md) for workflow details.
-
-### Connect to EKS
+### Connecting to EKS Cluster
 
 ```bash
 aws eks update-kubeconfig \
@@ -190,37 +261,34 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
-## Constraints
+---
+
+## Constraints & Limitations
 
 ### One Environment Per PR
 
-**Constraint**: Workflows support only one environment change per PR.
-
-**Reason**: Plan file naming conflict, clearer review process.
+Workflows support only one environment change per PR. Terraform plan file is saved per env resulting in naming conflict. But it gives clearer review process and guarantee of same apply.
 
 **Solution**: Create separate PRs for each environment.
 
-See [Main README - Assumptions](../README.md#assumptions) and [.github/README.md - Workflow Constraints](../.github/README.md#workflow-constraints) for details.
+**Example**:
 
-## Pipeline Integration
+```bash
+# ❌ WRONG: Changing both global and dev in one PR
+git add terraform/environments/global/ecr.tf
+git add terraform/environments/dev/eks.tf
+git commit -m "terraform: update global and dev"
 
-Pipelines auto-discover environments in `terraform/environments/`:
+# ✅ CORRECT: Separate PRs
+# PR 1: terraform/environments/global/ecr.tf
+# PR 2: terraform/environments/dev/eks.tf (after PR 1 merges)
+```
 
-- Auto-discovery of changed environments
-- Automatic `terraform fmt` and `validate`
-- Auto-apply after merge to main
-
-**Required GitHub Variables per environment**:
-
-- Format: `<ENV_NAME>_ECR_REGISTRY_URI`
-- Example: `DEV_ECR_REGISTRY_URI=910681227783.dkr.ecr.eu-west-1.amazonaws.com/mbocak-microservices-demo`
-
-Note: The variable should include the project name prefix (e.g., `/mbocak-microservices-demo`), not just the registry URL.
-
-See [.github/README.md](../.github/README.md) for complete workflow documentation.
+See [.github/](../.github) for workflow details.
 
 ## Related Documentation
 
 - [Main README](../README.md) - Project overview and setup guide
-- [.github/README.md](../.github/README.md) - CI/CD workflows
+- [.github/README.md](../.github/README.md) - CI/CD workflows and automation
+- [ArgoCD README](../argocd/README.md) - GitOps deployment configuration
 - [Terraform AWS Modules](https://registry.terraform.io/namespaces/terraform-aws-modules) - Module documentation
