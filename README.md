@@ -4,7 +4,7 @@
 
 This project demonstrates a complete DevOps automation pipeline for deploying a microservices application on AWS. Based on [Google Cloud's microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo), it showcases modern cloud-native practices and enterprise-grade CI/CD workflows.
 
-Focus went to ease the collaboration of developers and operators. Mundane tasks are automated, checks are perfomed automatically, so the information might flow from one to the other. Quality is enforced, no main branch pushes are acceptable, PRs are main way of communicating.  
+Focus went to ease the collaboration of developers and operators. Mundane tasks are automated, checks are perfomed automatically, so the information might flow from one to the other. Quality and small batches are enforced, no main branch pushes are acceptable, PRs are main way of communicating.  
 Made with flexible approach such as DRY/KISS, can be modified easily (more envs, reusable workflows, versioning changes, etc.)
 
 **What This Project Demonstrates**:
