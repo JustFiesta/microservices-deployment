@@ -66,6 +66,12 @@ After installing ArgoCD, retrieve the initial admin password:
 # Get the initial admin password
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
 
+# Login via Browser
+
+kubectl get svc -n argocd | grep -i loadbalancer # and login via external DNS
+
+# OR
+
 # Login via CLI (assuming ArgoCD is exposed publicly)
 argocd login <argocd-server-url> --username admin --password <password-from-above>
 
