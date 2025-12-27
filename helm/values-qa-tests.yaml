@@ -30,7 +30,7 @@ adservice:
   enabled: true
   replicaCount: 1
   image:
-    tag: "dev-1.0.0"  
+    tag: "qa-tests-1.0.0"  
 
 cartservice:
   enabled: true
