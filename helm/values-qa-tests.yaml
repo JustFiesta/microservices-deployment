@@ -1,4 +1,5 @@
-# Dev specific overrides for deployment
+# QA Tests specific overrides for deployment
+# Testing one microservice with qa-tests tag
 
 global:
   image:
