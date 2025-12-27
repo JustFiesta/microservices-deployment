@@ -308,7 +308,7 @@ resource "aws_iam_role" "eks_node_role" {
 
 #### 5. Deploy Infrastructure
 
-**IMPORTANT**: Deploy in TWO separate PRs due to "one environment per PR" constraint.
+**IMPORTANT**: Deploy in MULTIPLE separate PRs due to "one environment per PR" constraint and Terraform dependency requirements.
 
 ##### Step 5a: Deploy Global Resources (ECR Repositories)
 
@@ -326,32 +326,115 @@ git push origin terraform/deploy-global
 # Workflow automatically applies > ECR repositories created
 ```
 
-##### Step 5b: Deploy Dev Environment (EKS Cluster)
+##### Step 5b: Deploy Dev Environment - Part 1 (EKS Cluster Only)
 
-After global deployment completes, deploy dev infrastructure:
+**CRITICAL**: You MUST comment out resources that depend on EKS cluster data before first deployment to avoid "data source not found" errors.
+
+Files that MUST be commented out:
+- **ALL resources in `terraform/environments/dev/helm.tf`** (ArgoCD, NGINX Ingress, Metrics Server, Prometheus/Grafana)
+- **ALL resources in `terraform/environments/dev/security-groups.tf`** (they reference EKS cluster data)
+- **kubernetes and helm providers in `terraform/environments/dev/providers.tf`** (keep only: aws, random, null)
 
 ```bash
-# Create PR for dev environment
+# Prepare dev environment configuration
 git checkout main
 git pull origin main
-git checkout -b terraform/deploy-dev
-echo "# Deploy EKS" >> terraform/environments/dev/eks.tf
+git checkout -b terraform/deploy-dev-eks
+
+# Comment out the files mentioned above
+# In terraform/environments/dev/:
+# - Comment out ALL resources in helm.tf
+# - Comment out ALL resources in security-groups.tf
+# - Comment out kubernetes and helm providers in providers.tf
+
+# Commit the changes
 git add terraform/environments/dev/
-git commit -m "terraform(dev): create EKS cluster and VPC"
-git push origin terraform/deploy-dev
+git commit -m "terraform(dev): prepare for EKS cluster creation (commented dependent resources)"
+git push origin terraform/deploy-dev-eks
 
 # Create PR > Review terraform plan > Merge to main
-# Workflow automatically applies > EKS cluster + VPC + Helm components deployed
-# This takes ~15-20 minutes (EKS cluster creation)
+# Workflow automatically applies > EKS cluster + VPC created
+# WARNING: This takes ~15-20 minutes (EKS cluster creation)
 ```
 
-**Why Two PRs?**
+**Why comment out resources?**
 
+- Helm provider needs EKS cluster endpoint (doesn't exist yet)
+- Security groups reference EKS cluster data sources (doesn't exist yet)
+- Terraform will fail with "data source not found" errors if these are active on first apply
+
+##### Step 5c: Deploy Dev Environment - Part 2 (Helm Components)
+
+After EKS cluster is created, uncomment the resources and deploy Helm components:
+
+```bash
+# Wait for Step 5b to complete (check GitHub Actions)
+git checkout main
+git pull origin main
+git checkout -b terraform/deploy-dev-helm
+
+# Uncomment previously commented resources:
+# In terraform/environments/dev/:
+# - Uncomment ALL resources in helm.tf
+# - Uncomment ALL resources in security-groups.tf
+# - Uncomment kubernetes and helm providers in providers.tf
+
+# Commit the changes
+git add terraform/environments/dev/
+git commit -m "terraform(dev): deploy Helm components (ArgoCD, Ingress, Monitoring)"
+git push origin terraform/deploy-dev-helm
+
+# Create PR > Review terraform plan > Merge to main
+# Workflow automatically applies > ArgoCD, NGINX Ingress, Metrics Server, Prometheus & Grafana deployed
+```
+
+**Why Three PRs?**
+
+- **PR 1 (global)**: ECR must exist before image CI can push
+- **PR 2 (dev-eks)**: EKS cluster must exist before Helm/Kubernetes providers can work
+- **PR 3 (dev-helm)**: Clean separation, allows reviewing infrastructure vs application layer changes
 - Terraform workflows enforce one environment change per PR
-- ECR must exist before image CI can push
-- Clear separation of concerns (global resources vs environment-specific)
 
-To create new environments (qa, prod), copy `dev/` and adjust configuration (see [terraform/README.md](terraform/README.md))
+##### Creating Additional Environments (QA, Prod)
+
+To create a new environment based on dev:
+
+```bash
+# 1. Copy dev folder
+cp -r terraform/environments/dev terraform/environments/qa
+
+# 2. Create S3 bucket (follow Step 1)
+aws s3api create-bucket --bucket <your-name>-kubernetes-tf-state-qa-bucket --region eu-west-1 --create-bucket-configuration LocationConstraint=eu-west-1
+# + enable versioning and encryption
+
+# 3. Update terraform/environments/qa/backend.tf with new S3 bucket name
+
+# 4. Update terraform/environments/qa/local-vars.tf:
+#    project_name = "<your-name>-microservices-demo-qa"
+#    tags = { env = "qa", ... }
+
+# 5. Configure/remove IAM boundary policies in terraform/environments/qa/iam.tf (see Step 4b)
+
+# 6. Comment out resources (CRITICAL - same as Step 5b):
+#    - ALL resources in terraform/environments/qa/helm.tf
+#    - ALL resources in terraform/environments/qa/security-groups.tf
+#    - kubernetes/helm providers in terraform/environments/qa/providers.tf
+
+# 7. Create PR for EKS cluster
+git checkout -b terraform/deploy-qa-eks
+git add terraform/environments/qa/
+git commit -m "terraform(qa): create EKS cluster"
+git push origin terraform/deploy-qa-eks
+# Create PR > Merge > Wait 15-20 min
+
+# 8. Uncomment resources and create PR for Helm components
+git checkout -b terraform/deploy-qa-helm
+# Uncomment helm.tf, security-groups.tf, providers.tf
+git add terraform/environments/qa/
+git commit -m "terraform(qa): deploy Helm components"
+git push origin terraform/deploy-qa-helm
+# Create PR > Merge
+```
 
 #### 6. Configure Branch Protection
 
@@ -363,7 +446,7 @@ To create new environments (qa, prod), copy `dev/` and adjust configuration (see
 
 This ensures all changes go through PR review and automated checks (Terraform plan, CI builds, Helm validation).
 
-#### 7. Verify Infrastructure & Access ArgoCD
+#### 7. Verify Infrastructure
 
 After infrastructure deployment completes (Step 5), Terraform automatically installs via Helm:
 
@@ -388,34 +471,7 @@ kubectl get pods -n ingress-nginx
 kubectl get pods -n monitoring
 ```
 
-**Access ArgoCD UI**:
-
-```bash
-# Get ArgoCD LoadBalancer URL
-kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-
-# Get initial admin password
-kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
-
-# Login via browser: http://<LoadBalancer-URL>
-# Username: admin
-# Password: <password-from-above>
-```
-
-**Deploy ArgoCD Application for microservices**:
-
-```bash
-# Apply ArgoCD Application manifest
-kubectl apply -f argocd/dev/microservices-demo-dev.yaml -n argocd
-
-# Verify Application is created
-kubectl get applications -n argocd
-
-# Check sync status in ArgoCD UI or CLI
-argocd app get microservices-demo-dev
-```
-
-ArgoCD will automatically sync the Helm chart from `helm/` directory using environment-specific values (`values-dev.yaml`).
+**Note**: For accessing ArgoCD UI, Grafana, and other services, see [Step 9: Access Deployed Services](#9-access-deployed-services).
 
 #### 8. First Application Build & Deployment
 
@@ -461,14 +517,87 @@ kubectl get pods -n dev
 
 # Check services
 kubectl get svc -n dev
+```
 
-# Get frontend LoadBalancer URL
-kubectl get svc frontend -n dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+#### 9. Access Deployed Services
 
-# Or use port-forward for testing
+After successful deployment, you can access the following services:
+
+##### Frontend (Microservices Application)
+
+```bash
+# Get frontend Ingress URL
+kubectl get ingress -n dev
+
+# Output example:
+# NAME       CLASS   HOSTS   ADDRESS                                      PORTS   AGE
+# frontend   nginx   *       a1234567890abcdef.eu-west-1.elb.amazonaws.com   80      5m
+
+# Access in browser using the ADDRESS column
+# http://<ADDRESS-from-above>
+
+# Alternative: Port-forward for testing
 kubectl port-forward -n dev svc/frontend 8080:8080
 # Access: http://localhost:8080
 ```
+
+##### ArgoCD UI
+
+```bash
+# Get ArgoCD LoadBalancer URL
+kubectl get svc -n argocd
+
+# Look for argocd-server with type LoadBalancer and EXTERNAL-IP
+# Access: http://<EXTERNAL-IP>
+
+# Get initial admin password (base64 decode)
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
+echo  # Print newline
+
+# Login credentials:
+# Username: admin
+# Password: [output from above command]
+```
+
+**Deploy your application in ArgoCD**:
+
+After accessing ArgoCD UI, create the Application:
+
+```bash
+# Apply ArgoCD Application manifest for dev environment
+kubectl apply -f argocd/dev/microservices-demo-dev.yaml -n argocd
+
+# Verify Application is created
+kubectl get applications -n argocd
+
+# In ArgoCD UI you should see "microservices-demo-dev" application
+# Click on it to see all microservices being synced
+```
+
+The ArgoCD Application will automatically sync the Helm chart from `helm/` directory using environment-specific values (`values-dev.yaml`).
+
+##### Grafana (Monitoring Dashboard)
+
+```bash
+# Get Grafana LoadBalancer URL
+kubectl get svc -n monitoring
+
+# Look for kube-prometheus-stack-grafana with type LoadBalancer and EXTERNAL-IP
+# Access: http://<EXTERNAL-IP>
+
+# Login credentials:
+# Username: admin
+# Password: admin123
+# (password is hardcoded in terraform/environments/dev/helm.tf)
+```
+
+**Pre-configured Dashboards**:
+- Kubernetes Cluster Monitoring
+- Pod Metrics
+- Node Exporter
+- Prometheus Stats
+
+**Note**: LoadBalancer EXTERNAL-IP may take 2-3 minutes to provision after deployment. If you see `<pending>`, wait and retry.
 
 ## Local Testing
 
