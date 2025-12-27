@@ -236,6 +236,25 @@ See [Main README](../README.md#replication-guide) for complete setup instruction
 - Configuring GitHub secrets/variables
 - Deploying infrastructure via workflows (global first, then dev)
 
+### Creation of New Environment
+
+There are two approaches to make new one.
+
+1. Copy dev
+2. Create fully custom suited to ones needs
+
+Here is example flow when copying the dev environment.
+
+- Copy dev folder
+- Create S3 bucket manually for Terraform state
+- Update `backend.tf` with newly created S3 information
+- Comment out all resources in `helm.tf`, `security-groups.tf`, and kubernetes/helm providers with data info from `providers.tf`
+- Change/remove boundary policies in `iam.tf`
+- Change naming schemes in `local-vars.tf`
+- Create PR and merge it after all checks pass (it will take some time to create new EKS)
+- Uncomment `helm.tf`, `security-groups.tf`, and kubernetes/helm providers with data info from `providers.tf`
+- Create PR and merge it
+
 ### Modifying Existing Environment
 
 Deploy via GitHub Workflows using PRs:
