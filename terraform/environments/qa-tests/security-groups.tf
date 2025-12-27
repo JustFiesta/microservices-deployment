@@ -9,7 +9,7 @@ data "aws_security_groups" "backend_sg" {
     values = [module.vpc.vpc_id]
   }
 
-  depends_on = [module.eks]
+  depends_on = [module.eks, helm_release.nginx_ingress, helm_release.argocd]
 }
 
 data "aws_security_groups" "argocd_lb_sg" {
