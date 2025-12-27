@@ -1,0 +1,94 @@
+# Dev specific overrides for deployment
+
+global:
+  image:
+    tag: "dev"
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    host: "" # catch all, override in environment specific values files
+    annotations: {}
+      # Example AWS Load Balancer annotations (uncomment if needed):
+      # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      # service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+      # Example NGINX Ingress annotations:
+      # nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      # nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+      # nginx.ingress.kubernetes.io/rewrite-target: /
+
+loadgenerator:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+  users: "10000"
+  spawnRate: "10"
+
+adservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"  
+
+cartservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+checkoutservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+currencyservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+emailservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+paymentservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+productcatalogservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+recommendationservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+shippingservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
+
+
+shoppingassistantservice:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev-1.0.0"
