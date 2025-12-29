@@ -157,3 +157,4 @@ resource "helm_release" "kube_prometheus_stack" {
     kubernetes_namespace.monitoring,
   ]
 }
+# Test change trigger
