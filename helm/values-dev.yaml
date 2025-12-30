@@ -23,7 +23,7 @@ loadgenerator:
   replicaCount: 1
   image:
     tag: "dev-1.0.0"
-  users: "10000"
+  users: "100"
   spawnRate: "10"
 
 adservice:
