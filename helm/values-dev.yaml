@@ -60,7 +60,7 @@ frontend:
   enabled: true
   replicaCount: 1
   image:
-    tag: "1.0.0-cb16ad9"
+    tag: "1.0.0-0d2eaaa"
 
 paymentservice:
   enabled: true
